@@ -35,7 +35,7 @@ header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-co
 .who{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
 .login{display:grid;gap:12px;max-width:420px}
 .login .two{display:grid;grid-template-columns:1fr 130px;gap:10px}
-label.f{display:grid;gap:4px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+label.f,div.f{display:grid;gap:4px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 input,select{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0;width:100%}
 input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--muted)}
@@ -63,6 +63,7 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline
 .btn.sm{padding:6px 10px;font-size:13px}
 .btn.link{border:0;background:none;color:var(--muted);text-decoration:underline;padding:4px}
 .btn:disabled{opacity:.5;cursor:default}
+.btn.lang.on{background:var(--yes-bg);border-color:var(--yes);color:var(--yes)}
 .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .note{font-size:13px;color:var(--muted)}
 .shade{position:fixed;inset:0;background:var(--shade);z-index:20}
@@ -178,7 +179,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <label class="f">How far will you travel?<select data-info="distance"><option value="">Pick one</option><option>As far as needed</option><option>Orange County only</option><option>Up to 30 min from Santa Ana</option><option>LA is okay</option><option>Other (say below)</option></select></label>
       <label class="f">Can you drive yourself (or others)?<select data-info="driver"><option value="">Pick one</option><option>Yes</option><option>No</option><option>Maybe / depends</option></select></label>
       <label class="f">Comfortable leading a quartet?<select data-info="lead"><option value="">Pick one</option><option>Yes</option><option>No</option><option>Maybe</option></select></label>
-      <label class="f">Languages you're pretty comfortable singing in (besides English)<input data-info="langs" maxlength="80" placeholder="Spanish, Tagalog, German, French, or none"></label>
+      <div class="f" style="grid-column:1/-1">Languages you're pretty comfortable singing in (besides English)<input data-info="langs" type="hidden"><div class="tools" id="langBtns" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--fg)"><button class="btn sm lang" type="button" data-lang="Spanish">Spanish</button><button class="btn sm lang" type="button" data-lang="Tagalog">Tagalog</button><button class="btn sm lang" type="button" data-lang="German">German</button><button class="btn sm lang" type="button" data-lang="French">French</button><span style="width:8px"></span><button class="btn sm" type="button" id="langAll">All of these</button><button class="btn sm lang" type="button" data-lang="None">None</button></div></div>
       <label class="f" style="grid-column:1/-1">Anything we should know (health needs, places you can't do, etc.)<input data-info="notes" maxlength="200" placeholder="No strobe lights, need to sit after an hour, no downtown gigs"></label>
     </div>
     <div class="legend">
@@ -396,7 +397,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     document.querySelectorAll(".day[data-k]").forEach(b=>{
       const hs=norm(me.days[b.dataset.k]); b.className="day"+(hs!=null?" "+cls(hs):"")+(b.dataset.k===editingKey?" editing":""); b.querySelector(".t").textContent=text(hs);
     });
-    $("meName").textContent=me.name; $("voice").value=(me.voice||"")[0]||""; syncFlex(); if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; });
+    $("meName").textContent=me.name; $("voice").value=(me.voice||"")[0]||""; syncFlex(); if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; }); paintLangs();
   }
   function setStatus(t,err){ const s=$("status"); s.textContent=t; s.className="status"+(err?" err":""); }
 
@@ -462,6 +463,12 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   $("voice").addEventListener("change",e=>{ const m=e.target.value; me.voice=m?(m+($("flex").checked&&$("flexWrap").hidden===false?otherOf(m):"")):""; syncFlex(); queueSave(); });
   $("flex").addEventListener("change",e=>{ const m=(me.voice||"")[0]||""; if(!m) return; me.voice=m+(e.target.checked?otherOf(m):""); queueSave(); });
   $("phone").addEventListener("input",e=>{ me.phone=e.target.value.trim(); queueSave(); });
+  const LANGS=["Spanish","Tagalog","German","French"];
+  const langInput=()=>document.querySelector('[data-info="langs"]');
+  function paintLangs(){ const v=(langInput().value||"").split(",").map(x=>x.trim()).filter(Boolean); document.querySelectorAll("#langBtns .lang").forEach(b=>b.classList.toggle("on",v.includes(b.dataset.lang))); }
+  function setLangs(list){ const el=langInput(); el.value=list.join(", "); el.dispatchEvent(new Event("input",{bubbles:true})); paintLangs(); }
+  document.querySelectorAll("#langBtns .lang").forEach(b=>b.addEventListener("click",()=>{ const l=b.dataset.lang; let v=(langInput().value||"").split(",").map(x=>x.trim()).filter(Boolean); if(l==="None"){ setLangs(v.includes("None")?[]:["None"]); return; } v=v.filter(x=>x!=="None"); if(v.includes(l)) v=v.filter(x=>x!==l); else v.push(l); setLangs(LANGS.filter(x=>v.includes(x)).concat(v.filter(x=>!LANGS.includes(x)))); }));
+  $("langAll").addEventListener("click",()=>setLangs(LANGS.slice()));
   infoEls().forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{ me.info=me.info||{}; me.info[el.dataset.info]=e.target.value.trim(); queueSave(); }));
   $("allYes").addEventListener("click",()=>{ days.forEach(d=>{const k=key(d); if(norm(me.days[k])==null) me.days[k]={h:HOURS.slice()};}); paint(); queueSave(); });
   $("clear").addEventListener("click",()=>{ me.days={}; paint(); queueSave(); });
