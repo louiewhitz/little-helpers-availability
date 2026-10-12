@@ -644,7 +644,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     $("gDate").value=e.date; $("gDate").min=key(START); $("gDate").max=key(END);
     $("gGroup").value=e.group||"SALH"; $("gStart").value=e.start; $("gEnd").value=e.end; $("gCity").value=e.city; $("gClient").value=e.client; $("gAddress").value=e.address; $("gClientPhone").value=e.clientPhone; $("gOutfit").value=e.outfit; $("gPay").value=e.pay; $("gOwe").value=e.oweAfter; $("gEquip").value=e.equipment; $("gRequests").value=e.requests; $("gNotes").value=e.notes; $("gConfirmed").checked=!!e.confirmed; $("gClientPaid").checked=!!e.clientPaid;
     $("gDelete").hidden=!g; $("gStatus").textContent=""; $("gStatus").className="status";
-    renderPick(); $("gigEditor").hidden=false; $("gDate").focus();
+    renderPick(); $("gigEditor").hidden=false; $("gDate").focus(); if(!everyone.length) ensureEveryone().then(renderPick);
   }
   function closeGig(){ $("gigEditor").hidden=true; gigEditing=null; }
   function readGigForm(){
@@ -690,8 +690,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   });
   $("gigGroupFilter").addEventListener("change",renderGigs); $("gigShowPast").addEventListener("change",renderGigs);
   $("gigRefresh").addEventListener("click",()=>loadGigs()); $("payRefresh").addEventListener("click",()=>loadGigs());
-  $("tab-gigs").addEventListener("click",()=>{ show("view-gigs"); if(!gigsLoaded) loadGigs(); });
-  $("tab-pay").addEventListener("click",()=>{ show("view-pay"); if(!gigsLoaded) loadGigs(); });
+  async function ensureEveryone(){ if(everyone.length) return; try{ const j=await api({action:"admin",password:adminPass}); everyone=j.singers||[]; renderGigs(); renderPay(); }catch(e){} }
+  $("tab-gigs").addEventListener("click",()=>{ show("view-gigs"); if(!gigsLoaded) loadGigs(); ensureEveryone(); });
+  $("tab-pay").addEventListener("click",()=>{ show("view-pay"); if(!gigsLoaded) loadGigs(); ensureEveryone(); });
   function renderPay(){
     const t=$("payTable"); t.innerHTML="";
     const hr=document.createElement("tr"); ["Singer","Gig","Pay","Paid"].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
