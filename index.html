@@ -204,8 +204,17 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <button class="btn sm" id="hNone" type="button">Not available</button>
       <button class="btn sm" id="hClear" type="button">Clear (unanswered)</button>
     </div>
+    <p class="hint" style="margin-top:4px">Copy these hours to other days:</p>
+    <div class="tools">
+      <button class="btn sm" id="applyRest" type="button">Every unanswered day</button>
+      <button class="btn sm" id="applyDow" type="button">Every Monday</button>
+      <button class="btn sm" id="applyWeekdays" type="button">Every weekday (Mon–Fri)</button>
+      <button class="btn sm" id="applyWeekends" type="button">Every weekend day</button>
+      <button class="btn sm" id="applyAllDays" type="button">Every day</button>
+    </div>
+    <p class="hint" id="applyNote" style="margin:0"></p>
     <div class="row">
-      <button class="btn sm" id="applyRest" type="button">Also apply to every unanswered day</button>
+      <span></span>
       <div class="right"><button class="btn primary" id="doneDay" type="button">Done</button></div>
     </div>
   </div>
@@ -219,6 +228,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   const START = new Date(2026,10,15), END = new Date(2027,0,9);
   const HOL = {"2026-11-26":"Thanksgiving","2026-12-24":"Christmas Eve","2026-12-25":"Christmas","2026-12-31":"New Year's Eve","2027-01-01":"New Year's Day"};
   const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const DOW_LONG=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
   const MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const key = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   const days = []; for (let d=new Date(START); d<=END; d.setDate(d.getDate()+1)) days.push(new Date(d));
@@ -309,6 +319,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     editingKey=k; const d=days.find(x=>key(x)===k);
     $("sheetTitle").firstChild.textContent=DOW[d.getDay()]+", "+MON[d.getMonth()]+" "+d.getDate();
     $("sheetSub").textContent=HOL[k]||"";
+    $("applyDow").textContent="Every "+DOW_LONG[d.getDay()]; $("applyNote").textContent="";
     const hs=norm(me.days[k]); cur=hs==null?null:new Set(hs);
     paintSheet(); $("editor").hidden=false; paint();
   }
@@ -322,7 +333,17 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   $("hEve").addEventListener("click",()=>addBlock(17,24));
   $("doneDay").addEventListener("click",closeEditor);
   $("shade").addEventListener("click",closeEditor);
-  $("applyRest").addEventListener("click",()=>{ if(!cur) return; const v={h:HOURS.filter(h=>cur.has(h))}; days.forEach(d=>{const k=key(d); if(norm(me.days[k])==null) me.days[k]={h:v.h.slice()};}); me.days[editingKey]=v; paint(); queueSave(); closeEditor(); });
+  function applyTo(pick, label){
+    if(!cur) return; const v={h:HOURS.filter(h=>cur.has(h))}; let n=0;
+    days.forEach(d=>{ const k=key(d); if(k===editingKey) return; if(pick(d,k)){ me.days[k]={h:v.h.slice()}; n++; } });
+    me.days[editingKey]=v; paint(); queueSave();
+    $("applyNote").textContent="Copied to "+n+" other day"+(n===1?"":"s")+" ("+label+"). Tap Done when you're finished.";
+  }
+  $("applyRest").addEventListener("click",()=>applyTo((d,k)=>norm(me.days[k])==null,"unanswered days"));
+  $("applyDow").addEventListener("click",()=>{ const dow=new Date(editingKey+"T12:00:00").getDay(); applyTo(d=>d.getDay()===dow,"every "+DOW_LONG[dow]); });
+  $("applyWeekdays").addEventListener("click",()=>applyTo(d=>d.getDay()>=1&&d.getDay()<=5,"weekdays"));
+  $("applyWeekends").addEventListener("click",()=>applyTo(d=>d.getDay()===0||d.getDay()===6,"weekends"));
+  $("applyAllDays").addEventListener("click",()=>applyTo(()=>true,"every day"));
   document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!$("editor").hidden) closeEditor(); });
 
   // ---- saving ----
