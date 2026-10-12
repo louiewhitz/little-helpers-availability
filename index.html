@@ -143,7 +143,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
 
   <section id="view-me" class="wrap" style="gap:16px" hidden>
     <div class="card who">
-      <div><label class="f">Signed in as</label><div id="meName" style="font-weight:700;font-size:17px"></div><button class="btn link" id="switch" type="button" style="padding-left:0">Not you? Switch</button></div>
+      <div><label class="f">Signed in as</label><div id="meName" style="font-weight:700;font-size:17px"></div><button class="btn link" id="switch" type="button" style="padding-left:0">Not you? Switch</button> <button class="btn link" id="meAdminLink" type="button">Admin</button><div id="meAdminBox" hidden style="display:flex;gap:8px;margin-top:6px;align-items:end"><label class="f" style="flex:1">Admin password<input id="meAdminPass" type="password" autocomplete="off"></label><button class="btn" id="meAdminBtn" type="button">See everyone</button></div><div class="status" id="meAdminStatus"></div></div>
       <div style="display:grid;gap:6px"><label class="f">Main voice part<select id="voice"><option value="">Pick one</option><option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option></select></label><label id="flexWrap" class="note" style="display:flex;gap:8px;align-items:center;cursor:pointer" hidden><input id="flex" type="checkbox" style="width:auto;margin:0"><span id="flexText"></span></label></div>
       <label class="f" style="grid-column:1/-1">Cell phone (for the gig group text)<input id="phone" type="tel" inputmode="tel" placeholder="(949) 555-1234" autocomplete="tel" maxlength="24"></label>
       <label class="f">How far will you travel?<select data-info="distance"><option value="">Pick one</option><option>As far as needed</option><option>Orange County only</option><option>Up to 30 min from Santa Ana</option><option>LA is okay</option><option>Other (say below)</option></select></label>
@@ -358,18 +358,21 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   }
   $("loginBtn").addEventListener("click",()=>{ const n=$("loginName").value.trim(), p=$("loginPin").value.trim(); if(n.length<2){$("loginStatus").className="status err";$("loginStatus").textContent=ERR.bad_name;return;} if(!/^\d{4,6}$/.test(p)){$("loginStatus").className="status err";$("loginStatus").textContent=ERR.bad_pin;return;} signIn(n,p,false); });
   $("loginPin").addEventListener("keydown",e=>{ if(e.key==="Enter") $("loginBtn").click(); });
-  $("switch").addEventListener("click",()=>{ try{localStorage.removeItem("lh_name");localStorage.removeItem("lh_pin");}catch(e){} me={name:"",pin:"",voice:"",phone:"",info:{},days:{}}; adminPass=""; $("loginPin").value=""; show("view-login"); });
+  $("switch").addEventListener("click",()=>{ try{localStorage.removeItem("lh_name");localStorage.removeItem("lh_pin");}catch(e){} me={name:"",pin:"",voice:"",phone:"",info:{},days:{}}; adminPass=""; try{localStorage.removeItem("lh_admin");}catch(e){} $("loginPin").value=""; $("tabs").hidden=true; show("view-login"); });
   $("adminLink").addEventListener("click",()=>{ $("adminBox").hidden=!$("adminBox").hidden; if(!$("adminBox").hidden) $("adminPass").focus(); });
-  async function loadAdmin(){
-    const st=$("loginStatus"); st.className="status"; st.textContent="Loading everyone…";
-    try{ const j=await api({action:"admin",password:adminPass}); everyone=j.singers||[]; renderAdmin(); show("view-admin"); st.textContent=""; }
-    catch(e){ adminPass=""; st.className="status err"; st.textContent=errText(e); show("view-login"); }
+  async function loadAdmin(fromMe){
+    const st=$(fromMe?"meAdminStatus":"loginStatus"); st.className="status"; st.textContent="Loading everyone…";
+    try{ const j=await api({action:"admin",password:adminPass}); everyone=j.singers||[]; renderAdmin(); try{ localStorage.setItem("lh_admin",adminPass); }catch(e){} show("view-admin"); st.textContent=""; $("meAdminBox").hidden=true; }
+    catch(e){ adminPass=""; try{ localStorage.removeItem("lh_admin"); }catch(x){} st.className="status err"; st.textContent=errText(e); if(!fromMe) show("view-login"); else show("view-me"); }
   }
+  $("meAdminLink").addEventListener("click",()=>{ if(adminPass){ loadAdmin(true); return; } $("meAdminBox").hidden=!$("meAdminBox").hidden; if(!$("meAdminBox").hidden) $("meAdminPass").focus(); });
+  $("meAdminBtn").addEventListener("click",()=>{ adminPass=$("meAdminPass").value; loadAdmin(true); });
+  $("meAdminPass").addEventListener("keydown",e=>{ if(e.key==="Enter") $("meAdminBtn").click(); });
   $("adminBtn").addEventListener("click",()=>{ adminPass=$("adminPass").value; loadAdmin(); });
   $("adminPass").addEventListener("keydown",e=>{ if(e.key==="Enter") $("adminBtn").click(); });
   $("refresh").addEventListener("click",loadAdmin);
   $("tab-me").addEventListener("click",()=>{ if(me.name) show("view-me"); else show("view-login"); });
-  $("tab-admin").addEventListener("click",()=>show("view-admin"));
+  $("tab-admin").addEventListener("click",()=>{ if(everyone.length) show("view-admin"); else loadAdmin(true); });
 
   // ---- admin view ----
   (function(){ const f=$("gigFrom"), t=$("gigTo"); HOURS.forEach(h=>{const o=document.createElement("option");o.value=h;o.textContent=fmtH(h);f.appendChild(o);}); HOURS.forEach(h=>{const o=document.createElement("option");o.value=h+1;o.textContent=fmtH(h+1);t.appendChild(o);}); })();
@@ -441,7 +444,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
 
   // ---- boot ----
   buildMonths();
-  let savedName="", savedPin=""; try{ savedName=localStorage.getItem("lh_name")||""; savedPin=localStorage.getItem("lh_pin")||""; }catch(e){}
+  let savedName="", savedPin=""; try{ savedName=localStorage.getItem("lh_name")||""; savedPin=localStorage.getItem("lh_pin")||""; adminPass=localStorage.getItem("lh_admin")||""; }catch(e){}
   if(savedName&&savedPin){ $("loginName").value=savedName; $("loginPin").value=savedPin; signIn(savedName,savedPin,true); } else show("view-login");
 })();
 </script>
