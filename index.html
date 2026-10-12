@@ -175,6 +175,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     <div class="card who">
       <div><label class="f">Signed in as</label><div id="meName" style="font-weight:700;font-size:17px"></div><button class="btn link" id="switch" type="button" style="padding-left:0">Not you? Switch</button> <button class="btn link" id="meAdminLink" type="button">Admin</button><div id="meAdminBox" hidden style="display:flex;gap:8px;margin-top:6px;align-items:end"><label class="f" style="flex:1">Admin password<input id="meAdminPass" type="password" autocomplete="off"></label><button class="btn" id="meAdminBtn" type="button">See everyone</button></div><div class="status" id="meAdminStatus"></div></div>
       <div style="display:grid;gap:6px"><label class="f">Main voice part<select id="voice"><option value="">Pick one</option><option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option></select></label><label id="flexWrap" class="note" style="display:flex;gap:8px;align-items:center;cursor:pointer" hidden><input id="flex" type="checkbox" style="width:auto;margin:0"><span id="flexText"></span></label></div>
+      <label class="f" style="grid-column:1/-1">Which group are you in?<select data-info="group"><option value="SALH">Santa Ana's Little Helpers (Orange County)</option><option value="SMLH">Santa Monica's Little Helpers (LA)</option></select></label>
       <label class="f" style="grid-column:1/-1">Cell phone (for the gig group text)<input id="phone" type="tel" inputmode="tel" placeholder="(949) 555-1234" autocomplete="tel" maxlength="24"></label>
       <label class="f">How far will you travel?<select data-info="distance"><option value="">Pick one</option><option>As far as needed</option><option>Orange County only</option><option>Up to 30 min from Santa Ana</option><option>LA is okay</option><option>Other (say below)</option></select></label>
       <label class="f">Can you drive yourself (or others)?<select data-info="driver"><option value="">Pick one</option><option>Yes</option><option>No</option><option>Maybe / depends</option></select></label>
@@ -202,6 +203,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     <div class="card gigbar">
       <label class="f">Gig starts<select id="gigFrom"><option value="">Any time</option></select></label>
       <label class="f">Gig ends<select id="gigTo"><option value="">Any time</option></select></label>
+      <label class="f">Group<select id="groupFilter"><option value="all">Both groups</option><option value="SALH">SALH only</option><option value="SMLH">SMLH only</option></select></label>
       <label class="f">Show<select id="filter"><option value="all">All days</option><option value="weekend">Weekends only</option><option value="thin">Days with fewer than 4 who cover it</option></select></label>
       <button class="btn" id="toggleTable" type="button">Switch to table view</button>
       <button class="btn" id="refresh" type="button">Refresh</button>
@@ -508,7 +510,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   // ---- admin view ----
   (function(){ const f=$("gigFrom"), t=$("gigTo"); HOURS.forEach(h=>{const o=document.createElement("option");o.value=h;o.textContent=fmtH(h);f.appendChild(o);}); HOURS.forEach(h=>{const o=document.createElement("option");o.value=h+1;o.textContent=fmtH(h+1);t.appendChild(o);}); })();
   function renderAdmin(){
-    const singers=everyone.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    const grpF=$("groupFilter").value; const groupOf=s=>((s.info||{}).group==="SMLH"?"SMLH":"SALH");
+    const singers=everyone.filter(s=>grpF==="all"||groupOf(s)===grpF).sort((a,b)=>(a.name||"").localeCompare(b.name||""));
     let gf=$("gigFrom").value, gt=$("gigTo").value; if(gf!==""&&gt!==""&&+gt<=+gf){ gt=String(+gf+1); $("gigTo").value=gt; }
     const answered=singers.filter(s=>Object.keys(s.days||{}).length);
     let thin=0, full=0;
@@ -567,14 +570,14 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   const phonesOf = list => list.map(s=>(s.phone||"").trim()).filter(Boolean).join(", ");
   function renderPeople(singers){
     const t=$("peopleTable"); t.innerHTML="";
-    const hr=document.createElement("tr"); ["Name","Part","Phone","Travel","Drives","Lead","Languages","Notes","Days answered",""].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
-    singers.forEach(s=>{ const tr=document.createElement("tr"); [s.name||"Unnamed", voiceLong(s.voice), s.phone||"(none given)", (s.info||{}).distance||"", (s.info||{}).driver||"", (s.info||{}).lead||"", (s.info||{}).langs||"", (s.info||{}).notes||"", String(Object.keys(s.days||{}).length)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)});
+    const hr=document.createElement("tr"); ["Name","Group","Part","Phone","Travel","Drives","Lead","Languages","Notes","Days answered",""].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
+    singers.forEach(s=>{ const tr=document.createElement("tr"); [s.name||"Unnamed", ((s.info||{}).group==="SMLH"?"SMLH":"SALH"), voiceLong(s.voice), s.phone||"(none given)", (s.info||{}).distance||"", (s.info||{}).driver||"", (s.info||{}).lead||"", (s.info||{}).langs||"", (s.info||{}).notes||"", String(Object.keys(s.days||{}).length)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)});
       const td=document.createElement("td"); const b=document.createElement("button"); b.type="button"; b.className="btn sm"; b.textContent="Reset PIN"; const n=document.createElement("div"); n.className="note";
       b.addEventListener("click",async()=>{ if(b.dataset.c!=="1"){ b.dataset.c="1"; b.textContent="Tap again to reset"; setTimeout(()=>{ b.dataset.c=""; b.textContent="Reset PIN"; },4000); return; } b.disabled=true; try{ await api({action:"resetPin",password:adminPass,name:s.name}); b.textContent="Reset done"; n.textContent="Tell "+s.name+" to sign in with their name and any new 4-digit PIN; that becomes their PIN."; } catch(e){ b.textContent="Reset PIN"; n.textContent=errText(e); } b.disabled=false; });
       td.appendChild(b); td.appendChild(n); tr.appendChild(td); t.appendChild(tr); });
     $("copyAll").onclick=()=>copyText(phonesOf(singers),$("copyAllNote"),"all "+singers.filter(s=>s.phone).length+" numbers");
   }
-  ["filter","gigFrom","gigTo"].forEach(id=>$(id).addEventListener("change",renderAdmin));
+  ["filter","groupFilter","gigFrom","gigTo"].forEach(id=>$(id).addEventListener("change",renderAdmin));
   $("toggleTable").addEventListener("click",()=>{ tableMode=!tableMode; $("toggleTable").textContent=tableMode?"Switch to day-by-day view":"Switch to table view"; renderAdmin(); });
 
   // ---- gigs ----
@@ -658,18 +661,19 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const pb=$("gParts"); pb.innerHTML=""; ["S","A","T","B"].forEach(p=>{const sp=document.createElement("span");sp.textContent=p;if(parts.has(p))sp.className="on";else if(backup.has(p))sp.className="backup";pb.appendChild(sp);});
     const ready=!!(e.date&&e.start&&e.end);
     $("gPickHint").textContent=ready?"Green border = marked every hour of this gig free. Dashed = free for part of it. Tap to add to the quartet.":"Pick a date and time first to see who's free.";
-    const sorted=everyone.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+    const gOf=s=>((s.info||{}).group==="SMLH"?"SMLH":"SALH");
+    const sorted=everyone.slice().sort((a,b)=>((gOf(a)===e.group?0:1)-(gOf(b)===e.group?0:1))||(a.name||"").localeCompare(b.name||""));
     const free=[], others=[];
     sorted.forEach(s=>{ const st=ready?freeFor(s,e):"unknown"; (st==="free"||st==="partly"?free:others).push([s,st]); });
     // keep picked singers visible in the top list even if not free
-    const row=(s,st)=>{ const l=document.createElement("label"); l.className=(st==="free"?"free":st==="partly"?"partly":"")+(picked.has((s.name||"").toLowerCase())?" picked":""); const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=picked.has((s.name||"").toLowerCase()); cb.addEventListener("change",()=>{ const nm=s.name; if(cb.checked){ if(!e.singers.some(x=>x.toLowerCase()===nm.toLowerCase())) e.singers.push(nm); } else e.singers=e.singers.filter(x=>x.toLowerCase()!==nm.toLowerCase()); renderPick(); }); l.appendChild(cb); l.appendChild(document.createTextNode(s.name||"Unnamed")); const p=document.createElement("span"); p.className="p"; const hs=norm(s.days&&s.days[e.date]); p.textContent=(s.voice?voiceLabel(s.voice):"no part")+(st==="partly"&&hs?" · "+rangeText(hs,true):st==="no"?" · not free":st==="unknown"&&ready?" · no answer":""); l.appendChild(p); return l; };
+    const row=(s,st)=>{ const l=document.createElement("label"); l.className=(st==="free"?"free":st==="partly"?"partly":"")+(picked.has((s.name||"").toLowerCase())?" picked":""); const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=picked.has((s.name||"").toLowerCase()); cb.addEventListener("change",()=>{ const nm=s.name; if(cb.checked){ if(!e.singers.some(x=>x.toLowerCase()===nm.toLowerCase())) e.singers.push(nm); } else e.singers=e.singers.filter(x=>x.toLowerCase()!==nm.toLowerCase()); renderPick(); }); l.appendChild(cb); l.appendChild(document.createTextNode(s.name||"Unnamed")); const p=document.createElement("span"); p.className="p"; const hs=norm(s.days&&s.days[e.date]); p.textContent=(gOf(s)!==e.group?gOf(s)+" · ":"")+(s.voice?voiceLabel(s.voice):"no part")+(st==="partly"&&hs?" · "+rangeText(hs,true):st==="no"?" · not free":st==="unknown"&&ready?" · no answer":""); l.appendChild(p); return l; };
     const top=$("gPick"); top.innerHTML=""; const oth=$("gOthers"); oth.innerHTML="";
     free.forEach(([s,st])=>top.appendChild(row(s,st)));
     others.forEach(([s,st])=>{ if(picked.has((s.name||"").toLowerCase())) top.appendChild(row(s,st)); else oth.appendChild(row(s,st)); });
     if(!top.children.length){ const p=document.createElement("p"); p.className="empty"; p.textContent=ready?"Nobody has marked this time free yet. Check “Everyone else” below.":""; top.appendChild(p); }
     $("gOthersWrap").querySelector("summary").textContent="Everyone else ("+oth.children.length+")";
   }
-  ["gDate","gStart","gEnd"].forEach(id=>$(id).addEventListener("change",renderPick));
+  ["gDate","gStart","gEnd","gGroup"].forEach(id=>$(id).addEventListener("change",renderPick));
   $("addGig").addEventListener("click",()=>openGig(null));
   $("gCancel").addEventListener("click",closeGig); $("gigShade").addEventListener("click",closeGig);
   $("gSave").addEventListener("click",async()=>{
