@@ -144,7 +144,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   <section id="view-me" class="wrap" style="gap:16px" hidden>
     <div class="card who">
       <div><label class="f">Signed in as</label><div id="meName" style="font-weight:700;font-size:17px"></div><button class="btn link" id="switch" type="button" style="padding-left:0">Not you? Switch</button></div>
-      <label class="f">Voice part<select id="voice"><option value="">Pick one</option><option value="S">Soprano</option><option value="A">Alto</option><option value="SA">Soprano or Alto</option><option value="T">Tenor</option><option value="B">Bass</option><option value="TB">Tenor or Bass</option></select></label>
+      <div style="display:grid;gap:6px"><label class="f">Main voice part<select id="voice"><option value="">Pick one</option><option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option></select></label><label id="flexWrap" class="note" style="display:flex;gap:8px;align-items:center;cursor:pointer" hidden><input id="flex" type="checkbox" style="width:auto;margin:0"><span id="flexText"></span></label></div>
       <label class="f" style="grid-column:1/-1">Cell phone (for the gig group text)<input id="phone" type="tel" inputmode="tel" placeholder="(949) 555-1234" autocomplete="tel" maxlength="24"></label>
       <label class="f">How far will you travel?<select data-info="distance"><option value="">Pick one</option><option>As far as needed</option><option>Orange County only</option><option>Up to 30 min from Santa Ana</option><option>LA is okay</option><option>Other (say below)</option></select></label>
       <label class="f">Can you drive yourself (or others)?<select data-info="driver"><option value="">Pick one</option><option>Yes</option><option>No</option><option>Maybe / depends</option></select></label>
@@ -238,7 +238,12 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     return null;
   }
   const isAll = hs => hs&&hs.length===HOURS.length;
-  const voiceLabel = v => v?String(v).split("").join("/"):"";
+  const NAMES={S:"Soprano",A:"Alto",T:"Tenor",B:"Bass"};
+  const flexName = m => (m==="S"||m==="A")?"Sopralto":"Bari-tenor";
+  const otherOf = m => ({S:"A",A:"S",T:"B",B:"T"})[m]||"";
+  const voiceLabel = v => { v=String(v||""); if(!v) return ""; const m=v[0]; return m+(v.length>1?" ("+flexName(m)+")":""); };
+  const voiceLong = v => { v=String(v||""); if(!v) return ""; const m=v[0]; return (NAMES[m]||m)+(v.length>1?", "+flexName(m):""); };
+  function syncFlex(){ const m=(me.voice||"")[0]||""; $("flexWrap").hidden=!m; if(m){ $("flexText").textContent="I can also sing "+(NAMES[otherOf(m)]||"")+" ("+flexName(m)+")"; $("flex").checked=(me.voice||"").length>1; } }
   const cls = hs => hs==null?"":(hs.length===0?"no":isAll(hs)?"yes":"part");
   const text = hs => hs==null?"":(hs.length===0?"No":isAll(hs)?"All day":rangeText(hs,true));
   function covers(hs,from,to){ if(!hs||!hs.length) return false; if(from===""&&to==="") return true; const f=from===""?H0:+from, t=to===""?H1+1:+to; for(let h=f;h<t;h++) if(!hs.includes(h)) return false; return true; }
@@ -279,7 +284,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     document.querySelectorAll(".day[data-k]").forEach(b=>{
       const hs=norm(me.days[b.dataset.k]); b.className="day"+(hs!=null?" "+cls(hs):"")+(b.dataset.k===editingKey?" editing":""); b.querySelector(".t").textContent=text(hs);
     });
-    $("meName").textContent=me.name; $("voice").value=me.voice||""; if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; });
+    $("meName").textContent=me.name; $("voice").value=(me.voice||"")[0]||""; syncFlex(); if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; });
   }
   function setStatus(t,err){ const s=$("status"); s.textContent=t; s.className="status"+(err?" err":""); }
 
@@ -323,6 +328,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   function queueSave(){ clearTimeout(saveTimer); setStatus("Saving…"); saveTimer=setTimeout(save,900); }
   let saving=false, dirty=false;
   async function save(){
+    saveTimer=null;
     if(saving){ dirty=true; return; }
     saving=true; dirty=false;
     try{ await api({action:"save",name:me.name,pin:me.pin,voice:me.voice||"",phone:me.phone||"",info:me.info||{},days:me.days}); setStatus("Saved "+new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})); }
@@ -330,7 +336,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     saving=false; if(dirty) save();
   }
   window.addEventListener("beforeunload",e=>{ if(saveTimer||saving||dirty){ e.preventDefault(); e.returnValue=""; } });
-  $("voice").addEventListener("change",e=>{ me.voice=e.target.value; queueSave(); });
+  $("voice").addEventListener("change",e=>{ const m=e.target.value; me.voice=m?(m+($("flex").checked&&$("flexWrap").hidden===false?otherOf(m):"")):""; syncFlex(); queueSave(); });
+  $("flex").addEventListener("change",e=>{ const m=(me.voice||"")[0]||""; if(!m) return; me.voice=m+(e.target.checked?otherOf(m):""); queueSave(); });
   $("phone").addEventListener("input",e=>{ me.phone=e.target.value.trim(); queueSave(); });
   infoEls().forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{ me.info=me.info||{}; me.info[el.dataset.info]=e.target.value.trim(); queueSave(); }));
   $("allYes").addEventListener("click",()=>{ days.forEach(d=>{const k=key(d); if(norm(me.days[k])==null) me.days[k]={h:HOURS.slice()};}); paint(); queueSave(); });
@@ -426,7 +433,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   function renderPeople(singers){
     const t=$("peopleTable"); t.innerHTML="";
     const hr=document.createElement("tr"); ["Name","Part","Phone","Travel","Drives","Lead","Languages","Notes","Days answered"].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
-    singers.forEach(s=>{ const tr=document.createElement("tr"); [s.name||"Unnamed", voiceLabel(s.voice), s.phone||"(none given)", (s.info||{}).distance||"", (s.info||{}).driver||"", (s.info||{}).lead||"", (s.info||{}).langs||"", (s.info||{}).notes||"", String(Object.keys(s.days||{}).length)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)}); t.appendChild(tr); });
+    singers.forEach(s=>{ const tr=document.createElement("tr"); [s.name||"Unnamed", voiceLong(s.voice), s.phone||"(none given)", (s.info||{}).distance||"", (s.info||{}).driver||"", (s.info||{}).lead||"", (s.info||{}).langs||"", (s.info||{}).notes||"", String(Object.keys(s.days||{}).length)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)}); t.appendChild(tr); });
     $("copyAll").onclick=()=>copyText(phonesOf(singers),$("copyAllNote"),"all "+singers.filter(s=>s.phone).length+" numbers");
   }
   ["filter","gigFrom","gigTo"].forEach(id=>$(id).addEventListener("change",renderAdmin));
