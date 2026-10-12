@@ -356,6 +356,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       if(b.action==="gigs") return {ok:true,gigs:MOCK.gigs};
       if(b.action==="gigSave"){ const g=JSON.parse(JSON.stringify(b.gig)); if(!g.id) g.id=Math.random().toString(36).slice(2,10); const i=MOCK.gigs.findIndex(x=>x.id===g.id); if(i>=0) MOCK.gigs[i]=g; else MOCK.gigs.push(g); return {ok:true,gig:g}; }
       MOCK.gigs=MOCK.gigs.filter(x=>x.id!==b.id); return {ok:true}; }
+    if(b.action==="resetPin"){ const s=MOCK.singers[String(b.name||"").trim().toLowerCase()]; if(!s) throw {code:"not_found"}; s.reset=true; return {ok:true}; }
     if(b.action==="load"){ const s=MOCK.singers[k]; return s?{ok:true,isNew:false,name:s.name,voice:s.voice,phone:s.phone,info:s.info,days:s.days}:{ok:true,isNew:true,name:b.name,voice:"",phone:"",info:{},days:{}}; }
     if(b.action==="save"){ MOCK.singers[k]={name:b.name,voice:b.voice,phone:b.phone,info:b.info||{},days:b.days,updatedAt:new Date().toISOString()}; return {ok:true}; }
     throw {code:"unknown_action"};
@@ -366,7 +367,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const r = await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body),redirect:"follow"});
     const j = await r.json(); if(!j.ok) throw {code:j.error||"error"}; return j;
   }
-  const ERR = {not_configured:"The page isn't connected to its storage yet. Ask Louie.", wrong_pin:"That PIN doesn't match this name. If the name is taken, add your last initial.", bad_name:"Please enter your name (2 to 40 letters).", bad_pin:"PIN needs to be 4 to 6 digits.", bad_password:"Wrong admin password.", too_big:"Too much data; try clearing some days."};
+  const ERR = {not_configured:"The page isn't connected to its storage yet. Ask Louie.", wrong_pin:"That PIN doesn't match this name. If the name is taken, add your last initial.", bad_name:"Please enter your name (2 to 40 letters).", bad_pin:"PIN needs to be 4 to 6 digits.", bad_password:"Wrong admin password.", not_found:"That singer isn't in the sheet any more.", too_big:"Too much data; try clearing some days."};
   const errText = e => ERR[e&&e.code] || "Something went wrong ("+(e&&e.code||e&&e.message||"network")+"). Check your connection and try again.";
 
   // ---- calendar ----
@@ -481,8 +482,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       const j=await api({action:"load",name,pin});
       me={name:j.name||name,pin,voice:j.voice||"",phone:j.phone||"",info:j.info||{},days:j.days||{}};
       try{ localStorage.setItem("lh_name",name); localStorage.setItem("lh_pin",pin); }catch(e){}
-      paint(); show("view-me");
-      setStatus(j.isNew?"Welcome! Tap a day to begin. Remember your PIN; it's how you get back in.":"Welcome back. Tap any day to change it.");
+      paint(); show("view-me"); if(j.pinReset) queueSave();
+      setStatus(j.isNew?"Welcome! Tap a day to begin. Remember your PIN; it's how you get back in.":j.pinReset?"Welcome back. Your PIN was reset; the PIN you just typed is your new one.":"Welcome back. Tap any day to change it.");
     }catch(e){ st.className="status err"; st.textContent=silent?"":errText(e); if(silent) show("view-login"); }
     $("loginBtn").disabled=false;
   }
@@ -566,8 +567,11 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   const phonesOf = list => list.map(s=>(s.phone||"").trim()).filter(Boolean).join(", ");
   function renderPeople(singers){
     const t=$("peopleTable"); t.innerHTML="";
-    const hr=document.createElement("tr"); ["Name","Part","Phone","Travel","Drives","Lead","Languages","Notes","Days answered"].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
-    singers.forEach(s=>{ const tr=document.createElement("tr"); [s.name||"Unnamed", voiceLong(s.voice), s.phone||"(none given)", (s.info||{}).distance||"", (s.info||{}).driver||"", (s.info||{}).lead||"", (s.info||{}).langs||"", (s.info||{}).notes||"", String(Object.keys(s.days||{}).length)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)}); t.appendChild(tr); });
+    const hr=document.createElement("tr"); ["Name","Part","Phone","Travel","Drives","Lead","Languages","Notes","Days answered",""].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
+    singers.forEach(s=>{ const tr=document.createElement("tr"); [s.name||"Unnamed", voiceLong(s.voice), s.phone||"(none given)", (s.info||{}).distance||"", (s.info||{}).driver||"", (s.info||{}).lead||"", (s.info||{}).langs||"", (s.info||{}).notes||"", String(Object.keys(s.days||{}).length)].forEach(v=>{const td=document.createElement("td");td.textContent=v;tr.appendChild(td)});
+      const td=document.createElement("td"); const b=document.createElement("button"); b.type="button"; b.className="btn sm"; b.textContent="Reset PIN"; const n=document.createElement("div"); n.className="note";
+      b.addEventListener("click",async()=>{ if(b.dataset.c!=="1"){ b.dataset.c="1"; b.textContent="Tap again to reset"; setTimeout(()=>{ b.dataset.c=""; b.textContent="Reset PIN"; },4000); return; } b.disabled=true; try{ await api({action:"resetPin",password:adminPass,name:s.name}); b.textContent="Reset done"; n.textContent="Tell "+s.name+" to sign in with their name and any new 4-digit PIN; that becomes their PIN."; } catch(e){ b.textContent="Reset PIN"; n.textContent=errText(e); } b.disabled=false; });
+      td.appendChild(b); td.appendChild(n); tr.appendChild(td); t.appendChild(tr); });
     $("copyAll").onclick=()=>copyText(phonesOf(singers),$("copyAllNote"),"all "+singers.filter(s=>s.phone).length+" numbers");
   }
   ["filter","gigFrom","gigTo"].forEach(id=>$(id).addEventListener("change",renderAdmin));
