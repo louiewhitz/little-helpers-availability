@@ -93,6 +93,7 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline
 .parts{display:inline-flex;gap:3px;margin-top:4px}
 .parts span{font-size:10px;font-weight:700;width:18px;height:18px;border-radius:4px;display:inline-grid;place-items:center;border:1px solid var(--line);color:var(--muted)}
 .parts span.on{background:var(--yes-bg);color:var(--yes);border-color:var(--yes)}
+.parts span.backup{background:var(--part-bg);color:var(--part);border-color:var(--part);border-style:dashed}
 .chips{display:flex;flex-wrap:wrap;gap:4px 6px}
 .chip{font-size:12px;border-radius:999px;padding:2px 9px;border:1px solid var(--line);background:var(--bg);font-variant-numeric:tabular-nums}
 .chip.yes{background:var(--yes-bg);border-color:var(--yes)} .chip.part{background:var(--part-bg);border-color:var(--part)} .chip.no{background:var(--no-bg);border-color:var(--no);text-decoration:line-through;opacity:.8}
@@ -183,7 +184,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     </details>
     <div class="roster" id="roster"></div>
     <div class="tscroll" id="tableWrap" hidden></div>
-    <p class="note">Admins only. Each singer sees and edits only their own calendar. With a gig time set, a singer counts as covering the day only if every hour of the gig is marked; singers free at other times that day are shown faded.</p>
+    <p class="note">S A T B boxes: solid green means someone with that main part is available; dashed yellow means no one has it as a main part, but a Sopralto or Bari-tenor could cover it. Admins only. Each singer sees and edits only their own calendar. With a gig time set, a singer counts as covering the day only if every hour of the gig is marked; singers free at other times that day are shown faded.</p>
   </section>
 </div>
 
@@ -384,9 +385,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const perDay=days.map(d=>{
       const k=key(d);
       const rows=singers.map(s=>({s,hs:norm(s.days&&s.days[k])})).filter(r=>r.hs!=null);
-      const cover=rows.filter(r=>covers(r.hs,gf,gt)); const parts=new Set(); cover.forEach(r=>String(r.s.voice||"").split("").forEach(p=>parts.add(p)));
+      const cover=rows.filter(r=>covers(r.hs,gf,gt)); const parts=new Set(), backup=new Set(); cover.forEach(r=>{ const v=String(r.s.voice||""); if(v[0]) parts.add(v[0]); if(v[1]) backup.add(v[1]); });
       if(cover.length<4) thin++; if(["S","A","T","B"].every(p=>parts.has(p))) full++;
-      return {d,k,rows,cover,parts};
+      return {d,k,rows,cover,parts,backup};
     });
     $("sum").innerHTML="";
     const gigLabel=(gf||gt)?"cover "+(gf?fmtH(+gf):"start")+"–"+(gt?fmtH(+gt):"end"):"available";
@@ -403,7 +404,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       const dd=document.createElement("div"); dd.className="d"; dd.textContent=DOW[r.d.getDay()]+" "+MON[r.d.getMonth()].slice(0,3)+" "+r.d.getDate();
       if(HOL[r.k]){const sm=document.createElement("small");sm.textContent=HOL[r.k];dd.appendChild(sm);}
       const cnt=document.createElement("div"); cnt.className="cnt"; const bb=document.createElement("b"); bb.textContent=r.cover.length; cnt.appendChild(bb); cnt.appendChild(document.createTextNode(" "+gigLabel));
-      const parts=document.createElement("div"); parts.className="parts"; ["S","A","T","B"].forEach(p=>{const s=document.createElement("span");s.textContent=p;if(r.parts.has(p))s.className="on";parts.appendChild(s)});
+      const parts=document.createElement("div"); parts.className="parts"; ["S","A","T","B"].forEach(p=>{const s=document.createElement("span");s.textContent=p;if(r.parts.has(p)){s.className="on";s.title="Someone whose main part is "+p+" is available";}else if(r.backup.has(p)){s.className="backup";s.title="No "+p+" as a main part, but a Sopralto/Bari-tenor could cover it";}parts.appendChild(s)});
       dd.appendChild(cnt); dd.appendChild(parts);
       if(r.cover.length){ const cb=document.createElement("button"); cb.type="button"; cb.className="btn sm"; cb.style.marginTop="6px"; cb.textContent="Copy numbers"; const cn=document.createElement("div"); cn.className="note"; cb.addEventListener("click",()=>copyText(phonesOf(r.cover.map(x=>x.s)),cn,r.cover.filter(x=>x.s.phone).length+" numbers")); dd.appendChild(cb); dd.appendChild(cn); }
       const chips=document.createElement("div"); chips.className="chips";
