@@ -89,6 +89,7 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline
 .roster{display:grid;gap:8px}
 .drow{display:grid;grid-template-columns:118px 1fr;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;align-items:start}
 .drow.weekend{border-left:4px solid var(--accent)}
+.drow.allfree{background:var(--yes-bg);border-color:var(--yes)}
 .drow .d{font-weight:700;line-height:1.2}
 .drow .d small{display:block;color:var(--muted);font-weight:400}
 .drow .cnt{margin-top:4px;font-size:12px;color:var(--muted)}
@@ -148,6 +149,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     <div class="tabs" role="tablist" id="tabs" hidden>
       <button role="tab" id="tab-me" aria-selected="true">My availability</button>
       <button role="tab" id="tab-admin" aria-selected="false">Everyone</button>
+      <button role="tab" id="tab-group" aria-selected="false" hidden>Rehearsal days</button>
       <button role="tab" id="tab-gigs" aria-selected="false">Gigs</button>
       <button role="tab" id="tab-pay" aria-selected="false">Payouts</button>
     </div>
@@ -218,6 +220,16 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     <div class="roster" id="roster"></div>
     <div class="tscroll" id="tableWrap" hidden></div>
     <p class="note">S A T B boxes: solid green means someone with that main part is available; dashed yellow means no one has it as a main part, but a Sopralto or Bari-tenor could cover it. Admins only. Each singer sees and edits only their own calendar. With a gig time set, a singer counts as covering the day only if every hour of the gig is marked; singers free at other times that day are shown faded.</p>
+  </section>
+
+  <section id="view-group" class="wrap" style="gap:16px" hidden>
+    <div class="card">
+      <b>Santa Monica's Little Helpers: who's free when (through Nov 30)</b>
+      <p class="note" style="margin:6px 0 0">Use this to pick rehearsal days. Green rows are days everyone who has answered is free. Only SMLH singers can see this page, and it only shows names, parts and hours.</p>
+      <div class="tools" style="margin-top:10px"><label class="f">Show<select id="grpFilter"><option value="all">All days</option><option value="everyone">Days everyone is free</option><option value="weekend">Weekends</option><option value="weekday">Weekdays</option></select></label><button class="btn" id="grpRefresh" type="button">Refresh</button></div>
+      <div class="status" id="grpStatus"></div>
+    </div>
+    <div class="roster" id="grpList"></div>
   </section>
 
   <section id="view-gigs" class="wrap" style="gap:16px" hidden>
@@ -363,6 +375,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     if(b.action==="renameSinger"){ const k0=String(b.name||"").trim().toLowerCase(), s0=MOCK.singers[k0]; if(!s0) throw {code:"not_found"}; const nk=String(b.newName||"").trim().toLowerCase(); if(MOCK.singers[nk]&&nk!==k0) throw {code:"name_taken"}; delete MOCK.singers[k0]; s0.name=b.newName.trim(); MOCK.singers[nk]=s0; MOCK.gigs.forEach(g=>{ g.singers=g.singers.map(n=>n.toLowerCase()===k0?s0.name:n); }); return {ok:true,name:s0.name}; }
     if(b.action==="removeSinger"){ const k0=String(b.name||"").trim().toLowerCase(); if(!MOCK.singers[k0]) throw {code:"not_found"}; delete MOCK.singers[k0]; return {ok:true}; }
     if(b.action==="resetPin"){ const s=MOCK.singers[String(b.name||"").trim().toLowerCase()]; if(!s) throw {code:"not_found"}; s.reset=true; return {ok:true}; }
+    if(b.action==="groupView"){ const me0=MOCK.singers[k]; if(!me0) throw {code:"wrong_pin"}; if((me0.info||{}).group!=="SMLH") throw {code:"not_allowed"}; return {ok:true,until:"2026-12-01",singers:Object.values(MOCK.singers).filter(s=>(s.info||{}).group==="SMLH").map(s=>({name:s.name,voice:s.voice,days:Object.fromEntries(Object.entries(s.days||{}).filter(([k])=>k<"2026-12-01"))}))}; }
     if(b.action==="load"){ const s=MOCK.singers[k]; return s?{ok:true,isNew:false,name:s.name,voice:s.voice,phone:s.phone,info:s.info,days:s.days}:{ok:true,isNew:true,name:b.name,voice:"",phone:"",info:{},days:{}}; }
     if(b.action==="save"){ MOCK.singers[k]={name:b.name,voice:b.voice,phone:b.phone,info:b.info||{},days:b.days,updatedAt:new Date().toISOString()}; return {ok:true}; }
     throw {code:"unknown_action"};
@@ -373,7 +386,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const r = await fetch(API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body),redirect:"follow"});
     const j = await r.json(); if(!j.ok) throw {code:j.error||"error"}; return j;
   }
-  const ERR = {not_configured:"The page isn't connected to its storage yet. Ask Louie.", wrong_pin:"That PIN doesn't match this name. If the name is taken, add your last initial.", bad_name:"Please enter your name (2 to 40 letters).", bad_pin:"PIN needs to be 4 to 6 digits.", bad_password:"Wrong admin password.", not_found:"That singer isn't in the sheet any more.", name_taken:"Someone already uses that name. Add a last initial.", too_big:"Too much data; try clearing some days."};
+  const ERR = {not_configured:"The page isn't connected to its storage yet. Ask Louie.", wrong_pin:"That PIN doesn't match this name. If the name is taken, add your last initial.", bad_name:"Please enter your name (2 to 40 letters).", bad_pin:"PIN needs to be 4 to 6 digits.", bad_password:"Wrong admin password.", not_found:"That singer isn't in the sheet any more.", name_taken:"Someone already uses that name. Add a last initial.", not_allowed:"This view is only for Santa Monica's Little Helpers. Pick that group above if you're in it.", too_big:"Too much data; try clearing some days."};
   const errText = e => ERR[e&&e.code] || "Something went wrong ("+(e&&e.code||e&&e.message||"network")+"). Check your connection and try again.";
 
   // ---- calendar ----
@@ -476,12 +489,12 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   function setLangs(list){ const el=langInput(); el.value=list.join(", "); el.dispatchEvent(new Event("input",{bubbles:true})); paintLangs(); }
   document.querySelectorAll("#langBtns .lang").forEach(b=>b.addEventListener("click",()=>{ const l=b.dataset.lang; let v=(langInput().value||"").split(",").map(x=>x.trim()).filter(Boolean); if(l==="None"){ setLangs(v.includes("None")?[]:["None"]); return; } v=v.filter(x=>x!=="None"); if(v.includes(l)) v=v.filter(x=>x!==l); else v.push(l); setLangs(LANGS.filter(x=>v.includes(x)).concat(v.filter(x=>!LANGS.includes(x)))); }));
   $("langAll").addEventListener("click",()=>setLangs(LANGS.slice()));
-  infoEls().forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{ me.info=me.info||{}; me.info[el.dataset.info]=e.target.value.trim(); queueSave(); }));
+  infoEls().forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{ me.info=me.info||{}; me.info[el.dataset.info]=e.target.value.trim(); queueSave(); if(el.dataset.info==="group") show("view-me"); }));
   $("allYes").addEventListener("click",()=>{ days.forEach(d=>{const k=key(d); if(norm(me.days[k])==null) me.days[k]={h:HOURS.slice()};}); paint(); queueSave(); });
   $("clear").addEventListener("click",()=>{ me.days={}; paint(); queueSave(); });
 
   // ---- sign in ----
-  function show(view){ ["view-login","view-me","view-admin","view-gigs","view-pay"].forEach(v=>$(v).hidden=(v!==view)); $("tabs").hidden=!adminPass; [["tab-me","view-me"],["tab-admin","view-admin"],["tab-gigs","view-gigs"],["tab-pay","view-pay"]].forEach(([t,v])=>$(t).setAttribute("aria-selected",view===v)); window.scrollTo(0,0); }
+  function show(view){ ["view-login","view-me","view-admin","view-gigs","view-pay","view-group"].forEach(v=>$(v).hidden=(v!==view)); const smlh=!!me.name&&(me.info||{}).group==="SMLH"; $("tab-group").hidden=!smlh; ["tab-admin","tab-gigs","tab-pay"].forEach(t=>$(t).hidden=!adminPass); $("tabs").hidden=!(adminPass||smlh); [["tab-me","view-me"],["tab-admin","view-admin"],["tab-gigs","view-gigs"],["tab-pay","view-pay"],["tab-group","view-group"]].forEach(([t,v])=>$(t).setAttribute("aria-selected",view===v)); window.scrollTo(0,0); }
   async function signIn(name,pin,silent){
     const st=$("loginStatus"); st.className="status"; st.textContent="One moment…"; $("loginBtn").disabled=true;
     try{
@@ -729,6 +742,42 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       const a=document.createElement("td"); a.textContent=""; const b=document.createElement("td"); b.innerHTML="<b>"+by[n].length+" gig"+(by[n].length===1?"":"s")+"</b>"; const c=document.createElement("td"); c.innerHTML="<b>owed $"+owed+"</b>"; const d=document.createElement("td"); d.textContent="paid $"+paid; [a,b,c,d].forEach(x=>tr.appendChild(x)); t.appendChild(tr);
     });
   }
+
+  // ---- SMLH rehearsal view ----
+  let grp=[];
+  async function loadGroup(){
+    const st=$("grpStatus"); st.className="status"; st.textContent="Loading…";
+    try{ const j=await api({action:"groupView",name:me.name,pin:me.pin}); grp=j.singers||[]; st.textContent=""; renderGroup(); }
+    catch(e){ st.className="status err"; st.textContent=errText(e); }
+  }
+  function renderGroup(){
+    const host=$("grpList"); host.innerHTML="";
+    const f=$("grpFilter").value;
+    const answered=grp.filter(s=>Object.keys(s.days||{}).length);
+    if(!grp.length){ const p=document.createElement("p"); p.className="empty"; p.textContent="No Santa Monica singers have signed up yet."; host.appendChild(p); return; }
+    const cutoff=new Date(2026,11,1);
+    days.filter(d=>d<cutoff).forEach(d=>{
+      const k=key(d);
+      const rows=grp.map(s=>({s,hs:norm(s.days&&s.days[k])})).filter(r=>r.hs!=null);
+      const free=rows.filter(r=>r.hs.length);
+      const all=answered.length>0&&free.length===answered.length;
+      const wk=d.getDay()===0||d.getDay()===6;
+      if(f==="everyone"&&!all) return; if(f==="weekend"&&!wk) return; if(f==="weekday"&&wk) return;
+      const row=document.createElement("div"); row.className="drow"+(wk?" weekend":"")+(all?" allfree":"");
+      const dd=document.createElement("div"); dd.className="d"; dd.textContent=DOW[d.getDay()]+" "+MON[d.getMonth()].slice(0,3)+" "+d.getDate();
+      if(HOL[k]){const sm=document.createElement("small");sm.textContent=HOL[k];dd.appendChild(sm);}
+      const cnt=document.createElement("div"); cnt.className="cnt"; const bb=document.createElement("b"); bb.textContent=free.length; cnt.appendChild(bb); cnt.appendChild(document.createTextNode(" of "+grp.length+" free"+(all?" · everyone!":""))); dd.appendChild(cnt);
+      const chips=document.createElement("div"); chips.className="chips";
+      const order={yes:0,part:1,no:2};
+      rows.slice().sort((a,b)=>order[cls(a.hs)]-order[cls(b.hs)]).forEach(({s,hs})=>{ const c=document.createElement("span"); c.className="chip "+cls(hs); c.textContent=(s.name||"Unnamed")+(hs.length&&!isAll(hs)?" "+rangeText(hs,true):""); if(s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} chips.appendChild(c); });
+      const missing=grp.filter(s=>!rows.some(r=>r.s===s));
+      if(missing.length){ const c=document.createElement("span"); c.className="chip dim"; c.textContent="No answer yet: "+missing.map(s=>s.name).join(", "); chips.appendChild(c); }
+      row.appendChild(dd); row.appendChild(chips); host.appendChild(row);
+    });
+    if(!host.children.length){ const p=document.createElement("p"); p.className="empty"; p.textContent="No days match. Try “All days”."; host.appendChild(p); }
+  }
+  $("tab-group").addEventListener("click",()=>{ show("view-group"); loadGroup(); });
+  $("grpRefresh").addEventListener("click",loadGroup); $("grpFilter").addEventListener("change",renderGroup);
 
   // ---- boot ----
   buildMonths();
