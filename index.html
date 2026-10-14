@@ -50,6 +50,8 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline
 .day{position:relative;aspect-ratio:1/1;max-width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;font:inherit;color:var(--fg);padding:2px;user-select:none;overflow:hidden}
 .day:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .day.pad{visibility:hidden}
+.day.pre{border-style:dashed}
+.day .r{position:absolute;top:3px;left:5px;font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.03em}
 .day .n{font-weight:700;font-size:15px;font-variant-numeric:tabular-nums}
 .day .t{font-size:10px;line-height:1.1;text-align:center;color:var(--muted);font-variant-numeric:tabular-nums;max-width:100%}
 .day.yes{background:var(--yes-bg);border-color:var(--yes)} .day.yes .t{color:var(--yes)}
@@ -195,7 +197,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <button class="btn" id="allYes" type="button">Mark every unanswered day "All day"</button>
       <button class="btn" id="clear" type="button">Clear all</button>
     </div>
-    <p class="note">Season runs mid November through the first week of January. Gigs are usually 1 to 3 hours, any time from morning to late evening. Marking hours doesn't book you; admins assign quartets from this and confirm with you.</p>
+    <p class="note">Dashed days before Nov 15 are rehearsal availability. Gig season runs Nov 15 through Jan 9. Gigs are usually 1 to 3 hours, any time from morning to late evening. Marking hours doesn't book you; admins assign quartets from this and confirm with you.</p>
   </section>
 
   <section id="view-admin" class="wrap" style="gap:16px" hidden>
@@ -204,7 +206,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <label class="f">Gig starts<select id="gigFrom"><option value="">Any time</option></select></label>
       <label class="f">Gig ends<select id="gigTo"><option value="">Any time</option></select></label>
       <label class="f">Group<select id="groupFilter"><option value="all">Both groups</option><option value="SALH">SALH only</option><option value="SMLH">SMLH only</option></select></label>
-      <label class="f">Show<select id="filter"><option value="all">All days</option><option value="weekend">Weekends only</option><option value="thin">Days with fewer than 4 who cover it</option></select></label>
+      <label class="f">Show<select id="filter"><option value="all">All days</option><option value="weekend">Weekends only</option><option value="thin">Days with fewer than 4 who cover it</option><option value="everyone">Days where everyone who answered is free (rehearsal finder)</option><option value="pre">Rehearsal days only (before Nov 15)</option></select></label>
       <button class="btn" id="toggleTable" type="button">Switch to table view</button>
       <button class="btn" id="refresh" type="button">Refresh</button>
     </div>
@@ -314,7 +316,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   // ---- backend: Google Apps Script web app URL (set after deploying Code.gs) ----
   const API_URL = "https://script.google.com/macros/s/AKfycbwJzWwZFMD_2OJcqcpqo4viCkElc_qlBKcDoLDX1QdykAiNEYY5p2a1tlNybMtMlJ23uA/exec";
 
-  const START = new Date(2026,10,15), END = new Date(2027,0,9);
+  const START = new Date(2026,9,18), END = new Date(2027,0,9); const SEASON = new Date(2026,10,15); const isPre = d => d < SEASON;
   const HOL = {"2026-11-26":"Thanksgiving","2026-12-24":"Christmas Eve","2026-12-25":"Christmas","2026-12-31":"New Year's Eve","2027-01-01":"New Year's Day"};
   const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const DOW_LONG=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -379,13 +381,13 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     Object.keys(byMonth).forEach(k=>{
       const list=byMonth[k], first=list[0];
       const m=document.createElement("div"); m.className="month card";
-      const h=document.createElement("h2"); h.textContent=MON[first.getMonth()]+" "+first.getFullYear(); m.appendChild(h);
+      const h=document.createElement("h2"); h.textContent=MON[first.getMonth()]+" "+first.getFullYear(); m.appendChild(h); if(isPre(first)){const pn=document.createElement("p");pn.className="note";pn.style.margin="0 0 8px";pn.textContent=(first.getMonth()===9?"Dashed days (through Nov 14) are rehearsal availability: when could you make a rehearsal? From Nov 15 on it's gig availability.":"Dashed days are rehearsal availability; from Nov 15 on it's gig availability.");m.appendChild(pn);}
       const dow=document.createElement("div"); dow.className="dow"; DOW.forEach(x=>{const s=document.createElement("span");s.textContent=x;dow.appendChild(s)}); m.appendChild(dow);
       const g=document.createElement("div"); g.className="grid";
       for(let i=0;i<first.getDay();i++){const p=document.createElement("div");p.className="day pad";g.appendChild(p);}
       list.forEach(d=>{
         const k2=key(d);
-        const b=document.createElement("button"); b.type="button"; b.className="day"; b.dataset.k=k2; b.setAttribute("aria-label",d.toDateString());
+        const b=document.createElement("button"); b.type="button"; b.className="day"+(isPre(d)?" pre":""); b.dataset.k=k2; b.setAttribute("aria-label",d.toDateString()+(isPre(d)?" (rehearsal availability)":"")); if(isPre(d)){const rr=document.createElement("span");rr.className="r";rr.textContent="reh";b.appendChild(rr);}
         const n=document.createElement("span"); n.className="n"; n.textContent=d.getDate();
         const t=document.createElement("span"); t.className="t";
         b.appendChild(n); b.appendChild(t);
@@ -398,7 +400,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   }
   function paint(){
     document.querySelectorAll(".day[data-k]").forEach(b=>{
-      const hs=norm(me.days[b.dataset.k]); b.className="day"+(hs!=null?" "+cls(hs):"")+(b.dataset.k===editingKey?" editing":""); b.querySelector(".t").textContent=text(hs);
+      const hs=norm(me.days[b.dataset.k]); b.className="day"+(b.dataset.k<key(SEASON)?" pre":"")+(hs!=null?" "+cls(hs):"")+(b.dataset.k===editingKey?" editing":""); b.querySelector(".t").textContent=text(hs);
     });
     $("meName").textContent=me.name; $("voice").value=(me.voice||"")[0]||""; syncFlex(); if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; }); paintLangs();
   }
@@ -482,7 +484,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const st=$("loginStatus"); st.className="status"; st.textContent="One moment…"; $("loginBtn").disabled=true;
     try{
       const j=await api({action:"load",name,pin});
-      me={name:j.name||name,pin,voice:j.voice||"",phone:j.phone||"",info:j.info||{},days:j.days||{}};
+      me={name:j.name||name,pin,voice:j.voice||"",phone:j.phone||"",info:j.info||{},days:j.days||{}}; if(j.isNew&&/[?&]group=SMLH/i.test(location.search)){ me.info.group="SMLH"; }
       try{ localStorage.setItem("lh_name",name); localStorage.setItem("lh_pin",pin); }catch(e){}
       paint(); show("view-me"); if(j.pinReset) queueSave();
       setStatus(j.isNew?"Welcome! Tap a day to begin. Remember your PIN; it's how you get back in.":j.pinReset?"Welcome back. Your PIN was reset; the PIN you just typed is your new one.":"Welcome back. Tap any day to change it.");
@@ -529,13 +531,13 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     });
     renderPeople(singers);
     const f=$("filter").value;
-    const shown=perDay.filter(r=> f==="all" || (f==="weekend"&&(r.d.getDay()===0||r.d.getDay()===6)) || (f==="thin"&&r.cover.length<4));
+    const shown=perDay.filter(r=> f==="all" || (f==="weekend"&&(r.d.getDay()===0||r.d.getDay()===6)) || (f==="thin"&&r.cover.length<4) || (f==="everyone"&&answered.length>0&&r.cover.length===answered.length) || (f==="pre"&&isPre(r.d)));
     const host=$("roster"); host.innerHTML="";
     if(!singers.length){ const p=document.createElement("p");p.className="empty";p.textContent="No one has filled in availability yet. Share the link with the singers; their answers show up here as they come in."; host.appendChild(p); }
     shown.forEach(r=>{
       const row=document.createElement("div"); row.className="drow"+((r.d.getDay()===0||r.d.getDay()===6)?" weekend":"");
       const dd=document.createElement("div"); dd.className="d"; dd.textContent=DOW[r.d.getDay()]+" "+MON[r.d.getMonth()].slice(0,3)+" "+r.d.getDate();
-      if(HOL[r.k]){const sm=document.createElement("small");sm.textContent=HOL[r.k];dd.appendChild(sm);}
+      if(HOL[r.k]){const sm=document.createElement("small");sm.textContent=HOL[r.k];dd.appendChild(sm);} else if(isPre(r.d)){const sm=document.createElement("small");sm.textContent="rehearsal window";dd.appendChild(sm);}
       const cnt=document.createElement("div"); cnt.className="cnt"; const bb=document.createElement("b"); bb.textContent=r.cover.length; cnt.appendChild(bb); cnt.appendChild(document.createTextNode(" "+gigLabel));
       const parts=document.createElement("div"); parts.className="parts"; ["S","A","T","B"].forEach(p=>{const s=document.createElement("span");s.textContent=p;if(r.parts.has(p)){s.className="on";s.title="Someone whose main part is "+p+" is available";}else if(r.backup.has(p)){s.className="backup";s.title="No "+p+" as a main part, but a Sopralto/Bari-tenor could cover it";}parts.appendChild(s)});
       dd.appendChild(cnt); dd.appendChild(parts);
