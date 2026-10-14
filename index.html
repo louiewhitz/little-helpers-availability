@@ -181,7 +181,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <div style="display:grid;gap:6px"><label class="f">Main voice part<select id="voice"><option value="">Pick one</option><option value="S">Soprano</option><option value="A">Alto</option><option value="T">Tenor</option><option value="B">Bass</option></select></label><label id="flexWrap" class="note" style="display:flex;gap:8px;align-items:center;cursor:pointer" hidden><input id="flex" type="checkbox" style="width:auto;margin:0"><span id="flexText"></span></label></div>
       <label class="f" style="grid-column:1/-1">Which group are you in?<select data-info="group"><option value="SALH">Santa Ana's Little Helpers (Orange County)</option><option value="SMLH">Santa Monica's Little Helpers (LA)</option></select></label>
       <label class="f" style="grid-column:1/-1">Cell phone (for the gig group text)<input id="phone" type="tel" inputmode="tel" placeholder="(949) 555-1234" autocomplete="tel" maxlength="24"></label>
-      <label class="f">How far will you travel?<select data-info="distance"><option value="">Pick one</option><option>As far as needed</option><option>Orange County only</option><option>Up to 30 min from Santa Ana</option><option>LA is okay</option><option>Other (say below)</option></select></label>
+      <label class="f">How far will you travel for gigs?<select data-info="distance"><option value="">Pick one</option></select></label>
       <label class="f">Can you drive yourself (or others)?<select data-info="driver"><option value="">Pick one</option><option>Yes</option><option>No</option><option>Maybe / depends</option></select></label>
       <label class="f">Comfortable leading a quartet?<select data-info="lead"><option value="">Pick one</option><option>Yes</option><option>No</option><option>Maybe</option></select></label>
       <div class="f" style="grid-column:1/-1">Languages you're comfortable singing in (besides English)<span class="note" style="text-transform:none;letter-spacing:0;font-weight:400">Just whether you feel comfortable singing in it. You don't need to speak it or be fluent.</span><input data-info="langs" type="hidden"><div class="tools" id="langBtns" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:var(--fg)"><button class="btn sm lang" type="button" data-lang="Spanish">Spanish</button><button class="btn sm lang" type="button" data-lang="Tagalog">Tagalog</button><button class="btn sm lang" type="button" data-lang="German">German</button><button class="btn sm lang" type="button" data-lang="French">French</button><span style="width:8px"></span><button class="btn sm" type="button" id="langAll">All of these</button><button class="btn sm lang" type="button" data-lang="None">None</button></div></div>
@@ -357,6 +357,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   const otherOf = m => ({S:"A",A:"S",T:"B",B:"T"})[m]||"";
   const voiceLabel = v => { v=String(v||""); if(!v) return ""; const m=v[0]; return m+(v.length>1?" ("+flexName(m)+")":""); };
   const voiceLong = v => { v=String(v||""); if(!v) return ""; const m=v[0]; return (NAMES[m]||m)+(v.length>1?", "+flexName(m):""); };
+  const TRAVEL={SALH:["As far as needed","Orange County only","Up to 30 min from Santa Ana","LA is okay","Other (say below)"],SMLH:["As far as needed","LA only (Westside / Santa Monica area)","Up to 30 min from Santa Monica","Orange County is okay","Other (say below)"]};
+  function syncTravel(){ const sel=document.querySelector('[data-info="distance"]'); const g=(me.info||{}).group==="SMLH"?"SMLH":"SALH"; const cur=(me.info||{}).distance||""; sel.innerHTML=""; const o0=document.createElement("option"); o0.value=""; o0.textContent="Pick one"; sel.appendChild(o0); const list=TRAVEL[g].slice(); if(cur&&!list.includes(cur)) list.push(cur); list.forEach(t=>{const o=document.createElement("option");o.textContent=t;sel.appendChild(o);}); sel.value=cur; }
   function syncFlex(){ const m=(me.voice||"")[0]||""; $("flexWrap").hidden=!m; if(m){ $("flexText").textContent="I can also sing "+(NAMES[otherOf(m)]||"")+" ("+flexName(m)+")"; $("flex").checked=(me.voice||"").length>1; } }
   const cls = hs => hs==null?"":(hs.length===0?"no":isAll(hs)?"yes":"part");
   const text = hs => hs==null?"":(hs.length===0?"No":isAll(hs)?"All day":rangeText(hs,true));
@@ -417,7 +419,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     document.querySelectorAll(".day[data-k]").forEach(b=>{
       const hs=norm(me.days[b.dataset.k]); b.className="day"+(b.dataset.k<key(SEASON)?" pre":"")+(hs!=null?" "+cls(hs):"")+(b.dataset.k===editingKey?" editing":""); b.querySelector(".t").textContent=text(hs);
     });
-    $("meName").textContent=me.name; $("voice").value=(me.voice||"")[0]||""; syncFlex(); if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; }); paintLangs();
+    $("meName").textContent=me.name; $("voice").value=(me.voice||"")[0]||""; syncFlex(); if(document.activeElement!==$("phone")) $("phone").value=me.phone||""; syncTravel(); infoEls().forEach(el=>{ if(document.activeElement!==el) el.value=(me.info||{})[el.dataset.info]||""; }); paintLangs();
   }
   function setStatus(t,err){ const s=$("status"); s.textContent=t; s.className="status"+(err?" err":""); }
 
@@ -489,7 +491,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   function setLangs(list){ const el=langInput(); el.value=list.join(", "); el.dispatchEvent(new Event("input",{bubbles:true})); paintLangs(); }
   document.querySelectorAll("#langBtns .lang").forEach(b=>b.addEventListener("click",()=>{ const l=b.dataset.lang; let v=(langInput().value||"").split(",").map(x=>x.trim()).filter(Boolean); if(l==="None"){ setLangs(v.includes("None")?[]:["None"]); return; } v=v.filter(x=>x!=="None"); if(v.includes(l)) v=v.filter(x=>x!==l); else v.push(l); setLangs(LANGS.filter(x=>v.includes(x)).concat(v.filter(x=>!LANGS.includes(x)))); }));
   $("langAll").addEventListener("click",()=>setLangs(LANGS.slice()));
-  infoEls().forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{ me.info=me.info||{}; me.info[el.dataset.info]=e.target.value.trim(); queueSave(); if(el.dataset.info==="group") show("view-me"); }));
+  infoEls().forEach(el=>el.addEventListener(el.tagName==="SELECT"?"change":"input",e=>{ me.info=me.info||{}; me.info[el.dataset.info]=e.target.value.trim(); queueSave(); if(el.dataset.info==="group"){ syncTravel(); show("view-me"); } }));
   $("allYes").addEventListener("click",()=>{ days.forEach(d=>{const k=key(d); if(norm(me.days[k])==null) me.days[k]={h:HOURS.slice()};}); paint(); queueSave(); });
   $("clear").addEventListener("click",()=>{ me.days={}; paint(); queueSave(); });
 
