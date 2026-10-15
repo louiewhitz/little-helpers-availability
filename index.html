@@ -357,7 +357,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   const otherOf = m => ({S:"A",A:"S",T:"B",B:"T"})[m]||"";
   const voiceLabel = v => { v=String(v||""); if(!v) return ""; const m=v[0]; return m+(v.length>1?" ("+flexName(m)+")":""); };
   const voiceLong = v => { v=String(v||""); if(!v) return ""; const m=v[0]; return (NAMES[m]||m)+(v.length>1?", "+flexName(m):""); };
-  const TRAVEL={SALH:["As far as needed","Orange County only","Up to 30 min from Santa Ana","LA is okay","Other (say below)"],SMLH:["As far as needed","LA only (Westside / Santa Monica area)","Up to 30 min from Santa Monica","Orange County is okay","Other (say below)"]};
+  const TRAVEL={SALH:["As far as needed","Orange County only","Up to 30 min from Santa Ana","LA is okay","Other (say below)"],SMLH:["As far as needed","Within LA County","Up to 30 min from where I live","Orange County is okay too","Depends on the gig (ask me)","Other (say below)"]};
   function syncTravel(){ const sel=document.querySelector('[data-info="distance"]'); const g=(me.info||{}).group==="SMLH"?"SMLH":"SALH"; const cur=(me.info||{}).distance||""; sel.innerHTML=""; const o0=document.createElement("option"); o0.value=""; o0.textContent="Pick one"; sel.appendChild(o0); const list=TRAVEL[g].slice(); if(cur&&!list.includes(cur)) list.push(cur); list.forEach(t=>{const o=document.createElement("option");o.textContent=t;sel.appendChild(o);}); sel.value=cur; }
   function syncFlex(){ const m=(me.voice||"")[0]||""; $("flexWrap").hidden=!m; if(m){ $("flexText").textContent="I can also sing "+(NAMES[otherOf(m)]||"")+" ("+flexName(m)+")"; $("flex").checked=(me.voice||"").length>1; } }
   const cls = hs => hs==null?"":(hs.length===0?"no":isAll(hs)?"yes":"part");
