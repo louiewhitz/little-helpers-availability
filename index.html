@@ -111,6 +111,8 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
 .tscroll{overflow-x:auto}
 .gig{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
 .gig.smlh{border-left:4px solid var(--part)}
+.gig.inquiry{border-style:dashed}
+.gig.cancelled{opacity:.55}
 .gig .top{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;justify-content:space-between}
 .gig .when{font-weight:700;font-size:16px}
 .gig .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
@@ -237,6 +239,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <div class="tools">
         <button class="btn primary" id="addGig" type="button">+ Add gig</button>
         <select id="gigGroupFilter" style="width:auto"><option value="all">SALH and SMLH</option><option value="SALH">SALH only</option><option value="SMLH">SMLH only</option></select>
+        <select id="gigStatusFilter" style="width:auto"><option value="open">Inquiries, tentative and confirmed</option><option value="Inquiry">Inquiries only</option><option value="Tentative">Tentative only</option><option value="Confirmed">Confirmed only</option><option value="Cancelled">Cancelled</option></select>
         <label class="chk"><input type="checkbox" id="gigShowPast"> Show past gigs</label>
       </div>
       <button class="btn" id="gigRefresh" type="button">Refresh</button>
@@ -275,7 +278,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       <label class="f full">Equipment<input id="gEquip" placeholder="No / TBD / speaker, mic"></label>
       <label class="f full">Song requests<textarea id="gRequests" placeholder="Feliz Navidad, My Grown Up Christmas List"></textarea></label>
       <label class="f full">Notes<textarea id="gNotes" placeholder="Meet outside first; 3 x 10 min breaks"></textarea></label>
-      <div class="full tools"><label class="chk"><input type="checkbox" id="gConfirmed"> Confirmed with client</label><label class="chk"><input type="checkbox" id="gClientPaid"> Client has paid</label></div>
+      <label class="f">Status<select id="gStatusSel"><option>Inquiry</option><option>Tentative</option><option>Confirmed</option><option>Cancelled</option></select></label>
+      <label class="f">Client email<input id="gClientEmail" type="email" placeholder="name@company.com"></label>
+      <div class="full tools"><label class="chk"><input type="checkbox" id="gClientPaid"> Client has paid</label></div>
     </div>
     <div>
       <div class="tools" style="justify-content:space-between;align-items:center"><b>Singers</b><div class="parts" id="gParts"></div></div>
@@ -558,7 +563,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       const cnt=document.createElement("div"); cnt.className="cnt"; const bb=document.createElement("b"); bb.textContent=r.cover.length; cnt.appendChild(bb); cnt.appendChild(document.createTextNode(" "+gigLabel));
       const parts=document.createElement("div"); parts.className="parts"; ["S","A","T","B"].forEach(p=>{const s=document.createElement("span");s.textContent=p;if(r.parts.has(p)){s.className="on";s.title="Someone whose main part is "+p+" is available";}else if(r.backup.has(p)){s.className="backup";s.title="No "+p+" as a main part, but a Sopralto/Bari-tenor could cover it";}parts.appendChild(s)});
       dd.appendChild(cnt); dd.appendChild(parts);
-      const dayGigs=gigs.filter(g=>g.date===r.k); if(dayGigs.length){ const gl=document.createElement("div"); gl.className="gigline"; gl.textContent="Gig"+(dayGigs.length>1?"s":"")+": "+dayGigs.map(g=>tfmt(g.start)+"–"+tfmt(g.end)+" "+(g.city||"")+(g.singers.length?" ("+g.singers.length+" set)":" (no singers yet)")).join("; "); dd.appendChild(gl); }
+      const dayGigs=gigs.filter(g=>g.date===r.k&&(g.status||(g.confirmed?"Confirmed":"Inquiry"))!=="Cancelled"); if(dayGigs.length){ const gl=document.createElement("div"); gl.className="gigline"; gl.textContent=dayGigs.map(g=>{const st=g.status||(g.confirmed?"Confirmed":"Inquiry"); return (st==="Confirmed"?"Gig":st)+": "+tfmt(g.start)+"–"+tfmt(g.end)+" "+(g.city||"")+(g.singers.length?" ("+g.singers.length+" set)":"");}).join("; "); dd.appendChild(gl); }
       if(r.cover.length){ const cb=document.createElement("button"); cb.type="button"; cb.className="btn sm"; cb.style.marginTop="6px"; cb.textContent="Copy numbers"; const cn=document.createElement("div"); cn.className="note"; cb.addEventListener("click",()=>copyText(phonesOf(r.cover.map(x=>x.s)),cn,r.cover.filter(x=>x.s.phone).length+" numbers")); dd.appendChild(cb); dd.appendChild(cn); }
       const chips=document.createElement("div"); chips.className="chips";
       const order={yes:0,part:1,no:2};
@@ -615,7 +620,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   const freeFor = (s,g) => { const hs=norm(s.days&&s.days[g.date]); const need=gigHours(g); if(!hs||!need||!need.length) return "unknown"; const n=need.filter(h=>hs.includes(h)).length; return n===need.length?"free":n>0?"partly":"no"; };
   function gigDetails(g){
     const L=[];
-    L.push((g.group==="SMLH"?"SMLH":"SALH")+" gig: "+fmtDate(g.date)+", "+tfmt(g.start)+" to "+tfmt(g.end));
+    L.push((g.group==="SMLH"?"SMLH":"SALH")+" gig ("+(g.status||(g.confirmed?"Confirmed":"Inquiry"))+"): "+fmtDate(g.date)+", "+tfmt(g.start)+" to "+tfmt(g.end));
     if(g.city||g.address) L.push("Where: "+(g.address&&g.city&&g.address.toLowerCase().includes(g.city.toLowerCase())?g.address:[g.address,g.city].filter(Boolean).join(", ")));
     if(g.client) L.push("Client: "+g.client+(g.clientPhone?" "+g.clientPhone:""));
     if(g.outfit) L.push("Outfit: "+g.outfit);
@@ -634,23 +639,24 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
   }
   function renderGigs(){
     const host=$("gigList"); host.innerHTML="";
-    const grp=$("gigGroupFilter").value, past=$("gigShowPast").checked, today=todayKey();
-    const list=gigs.filter(g=>(grp==="all"||g.group===grp)&&(past||!g.date||g.date>=today));
+    const grp=$("gigGroupFilter").value, past=$("gigShowPast").checked, today=todayKey(), stf=$("gigStatusFilter").value;
+    const stOf=g=>g.status||(g.confirmed?"Confirmed":"Inquiry");
+    const list=gigs.filter(g=>(grp==="all"||g.group===grp)&&(past||!g.date||g.date>=today)&&(stf==="open"?stOf(g)!=="Cancelled":stOf(g)===stf));
     if(!list.length){ const p=document.createElement("p"); p.className="empty"; p.textContent=gigs.length?"No gigs match this filter.":"No gigs yet. Tap “Add gig” to book the first one."; host.appendChild(p); return; }
     list.forEach(g=>{
-      const card=document.createElement("div"); card.className="gig"+(g.group==="SMLH"?" smlh":"");
+      const st=stOf(g); const card=document.createElement("div"); card.className="gig"+(g.group==="SMLH"?" smlh":"")+(st==="Inquiry"||st==="Tentative"?" inquiry":"")+(st==="Cancelled"?" cancelled":"");
       const top=document.createElement("div"); top.className="top";
       const when=document.createElement("div"); when.className="when"; when.textContent=fmtDate(g.date)+" · "+tfmt(g.start)+"–"+tfmt(g.end)+(g.city?" · "+g.city:""); top.appendChild(when);
       const badges=document.createElement("div"); badges.className="tools";
       const mk=(t,c)=>{const b=document.createElement("span");b.className="badge "+c;b.textContent=t;badges.appendChild(b);};
       mk(g.group==="SMLH"?"SMLH":"SALH","");
-      mk(g.confirmed?"Confirmed":"Not confirmed",g.confirmed?"ok":"warn");
+      mk(st, st==="Confirmed"?"ok":st==="Cancelled"?"bad":st==="Tentative"?"warn":"");
       mk(g.clientPaid?"Client paid":"Client unpaid",g.clientPaid?"ok":"");
       const paidN=g.singers.filter(n=>g.paid[n]).length; if(g.singers.length) mk("Cast paid "+paidN+"/"+g.singers.length, paidN===g.singers.length?"ok":paidN?"warn":"");
       if(g.singers.length<4) mk(g.singers.length+" of 4 singers","bad");
       top.appendChild(badges); card.appendChild(top);
       const meta=document.createElement("div"); meta.className="meta";
-      [["Client",g.client+(g.clientPhone?" "+g.clientPhone:"")],["Outfit",g.outfit],["Pay","$"+String(g.pay||"?").replace(/^\$/,"")+"/singer"],["Equipment",g.equipment],["Address",g.address]].forEach(([k,v])=>{ if(!v||v==="$?/singer") return; const sp=document.createElement("span"); const b=document.createElement("b"); b.textContent=k+": "; sp.appendChild(b); sp.appendChild(document.createTextNode(v)); meta.appendChild(sp); });
+      [["Client",g.client+(g.clientPhone?" "+g.clientPhone:"")+(g.clientEmail?" · "+g.clientEmail:"")],["Outfit",g.outfit],["Pay","$"+String(g.pay||"?").replace(/^\$/,"")+"/singer"],["Equipment",g.equipment],["Address",g.address]].forEach(([k,v])=>{ if(!v||v==="$?/singer") return; const sp=document.createElement("span"); const b=document.createElement("b"); b.textContent=k+": "; sp.appendChild(b); sp.appendChild(document.createTextNode(v)); meta.appendChild(sp); });
       card.appendChild(meta);
       if(g.requests||g.notes){ const n=document.createElement("div"); n.className="note"; n.textContent=[g.requests?"Requests: "+g.requests:"",g.notes?"Notes: "+g.notes:""].filter(Boolean).join("  ·  "); card.appendChild(n); }
       const chips=document.createElement("div"); chips.className="chips";
@@ -666,17 +672,17 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     });
   }
   function openGig(g){
-    gigEditing = g ? JSON.parse(JSON.stringify(g)) : {id:"",date:"",start:"",end:"",city:"",address:"",client:"",clientPhone:"",outfit:"Dickens",equipment:"",pay:"80",oweAfter:"",requests:"",notes:"",group:"SALH",singers:[],confirmed:false,clientPaid:false,paid:{}};
+    gigEditing = g ? JSON.parse(JSON.stringify(g)) : {id:"",date:"",start:"",end:"",city:"",address:"",client:"",clientPhone:"",outfit:"Dickens",equipment:"",pay:"80",oweAfter:"",requests:"",notes:"",group:"SALH",singers:[],status:"Inquiry",clientEmail:"",confirmed:false,clientPaid:false,paid:{}};
     const e=gigEditing;
     $("gigTitle").textContent=g?"Edit gig":"New gig";
     $("gDate").value=e.date; $("gDate").min=key(START); $("gDate").max=key(END);
-    $("gGroup").value=e.group||"SALH"; $("gStart").value=e.start; $("gEnd").value=e.end; $("gCity").value=e.city; $("gClient").value=e.client; $("gAddress").value=e.address; $("gClientPhone").value=e.clientPhone; $("gOutfit").value=e.outfit; $("gPay").value=e.pay; $("gOwe").value=e.oweAfter; $("gEquip").value=e.equipment; $("gRequests").value=e.requests; $("gNotes").value=e.notes; $("gConfirmed").checked=!!e.confirmed; $("gClientPaid").checked=!!e.clientPaid;
+    $("gGroup").value=e.group||"SALH"; $("gStart").value=e.start; $("gEnd").value=e.end; $("gCity").value=e.city; $("gClient").value=e.client; $("gAddress").value=e.address; $("gClientPhone").value=e.clientPhone; $("gOutfit").value=e.outfit; $("gPay").value=e.pay; $("gOwe").value=e.oweAfter; $("gEquip").value=e.equipment; $("gRequests").value=e.requests; $("gNotes").value=e.notes; $("gStatusSel").value=e.status||(e.confirmed?"Confirmed":"Inquiry"); $("gClientEmail").value=e.clientEmail||""; $("gClientPaid").checked=!!e.clientPaid;
     $("gDelete").hidden=!g; $("gStatus").textContent=""; $("gStatus").className="status";
     renderPick(); $("gigEditor").hidden=false; $("gDate").focus(); if(!everyone.length) ensureEveryone().then(renderPick);
   }
   function closeGig(){ $("gigEditor").hidden=true; gigEditing=null; }
   function readGigForm(){
-    const e=gigEditing; e.date=$("gDate").value; e.group=$("gGroup").value; e.start=$("gStart").value; e.end=$("gEnd").value; e.city=$("gCity").value.trim(); e.client=$("gClient").value.trim(); e.address=$("gAddress").value.trim(); e.clientPhone=$("gClientPhone").value.trim(); e.outfit=$("gOutfit").value.trim(); e.pay=$("gPay").value.trim(); e.oweAfter=$("gOwe").value.trim(); e.equipment=$("gEquip").value.trim(); e.requests=$("gRequests").value.trim(); e.notes=$("gNotes").value.trim(); e.confirmed=$("gConfirmed").checked; e.clientPaid=$("gClientPaid").checked;
+    const e=gigEditing; e.date=$("gDate").value; e.group=$("gGroup").value; e.start=$("gStart").value; e.end=$("gEnd").value; e.city=$("gCity").value.trim(); e.client=$("gClient").value.trim(); e.address=$("gAddress").value.trim(); e.clientPhone=$("gClientPhone").value.trim(); e.outfit=$("gOutfit").value.trim(); e.pay=$("gPay").value.trim(); e.oweAfter=$("gOwe").value.trim(); e.equipment=$("gEquip").value.trim(); e.requests=$("gRequests").value.trim(); e.notes=$("gNotes").value.trim(); e.status=$("gStatusSel").value; e.confirmed=e.status==="Confirmed"; e.clientEmail=$("gClientEmail").value.trim(); e.clientPaid=$("gClientPaid").checked;
   }
   function renderPick(){
     const e=gigEditing; if(!e) return; readGigForm();
@@ -717,7 +723,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     catch(err){ st.className="status err"; st.textContent=errText(err); }
     st.dataset.confirm="";
   });
-  $("gigGroupFilter").addEventListener("change",renderGigs); $("gigShowPast").addEventListener("change",renderGigs);
+  $("gigGroupFilter").addEventListener("change",renderGigs); $("gigStatusFilter").addEventListener("change",renderGigs); $("gigShowPast").addEventListener("change",renderGigs);
   $("gigRefresh").addEventListener("click",()=>loadGigs()); $("payRefresh").addEventListener("click",()=>loadGigs());
   async function ensureEveryone(){ if(everyone.length) return; try{ const j=await api({action:"admin",password:adminPass}); everyone=j.singers||[]; renderGigs(); renderPay(); }catch(e){} }
   $("tab-gigs").addEventListener("click",()=>{ show("view-gigs"); if(!gigsLoaded) loadGigs(); ensureEveryone(); });
@@ -726,7 +732,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const t=$("payTable"); t.innerHTML="";
     const hr=document.createElement("tr"); ["Singer","Gig","Pay","Paid"].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
     const by={};
-    gigs.forEach(g=>g.singers.forEach(n=>{ (by[n]=by[n]||[]).push(g); }));
+    gigs.filter(g=>(g.status||(g.confirmed?"Confirmed":"Inquiry"))!=="Cancelled").forEach(g=>g.singers.forEach(n=>{ (by[n]=by[n]||[]).push(g); }));
     const names=Object.keys(by).sort((a,b)=>a.localeCompare(b));
     if(!names.length){ const tr=document.createElement("tr"); const td=document.createElement("td"); td.colSpan=4; td.className="empty"; td.textContent="No singers assigned to gigs yet."; tr.appendChild(td); t.appendChild(tr); return; }
     names.forEach(n=>{
