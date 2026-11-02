@@ -206,6 +206,17 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
 
   <section id="view-admin" class="wrap" style="gap:16px" hidden>
     <div class="sum" id="sum"></div>
+    <div class="card" id="finder">
+      <b>Who's free at a specific day and time?</b>
+      <div class="gigbar" style="margin-top:8px">
+        <label class="f">Day<input type="date" id="fDate"></label>
+        <label class="f">From<select id="fFrom"></select></label>
+        <label class="f">To<select id="fTo"></select></label>
+        <label class="f">Group<select id="fGroup"><option value="all">Both groups</option><option value="SALH">SALH only</option><option value="SMLH">SMLH only</option></select></label>
+        <button class="btn primary" id="fGo" type="button">Show who's free</button>
+      </div>
+      <div id="fOut" style="margin-top:10px"></div>
+    </div>
     <div class="card gigbar">
       <label class="f">Gig starts<select id="gigFrom"><option value="">Any time</option></select></label>
       <label class="f">Gig ends<select id="gigTo"><option value="">Any time</option></select></label>
@@ -608,6 +619,41 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     $("copyAll").onclick=()=>copyText(phonesOf(singers),$("copyAllNote"),"all "+singers.filter(s=>s.phone).length+" numbers");
   }
   ["filter","groupFilter","gigFrom","gigTo"].forEach(id=>$(id).addEventListener("change",renderAdmin));
+
+  // ---- who's free finder ----
+  (function(){ const f=$("fFrom"), t=$("fTo"); HOURS.forEach(h=>{const o=document.createElement("option");o.value=h;o.textContent=fmtH(h);f.appendChild(o);}); HOURS.forEach(h=>{const o=document.createElement("option");o.value=h+1;o.textContent=fmtH(h+1);t.appendChild(o);}); f.value="18"; t.value="19";
+    const d=$("fDate"); d.min=key(START); d.max=key(END); const now=new Date(); d.value=(now>=START&&now<=END)?key(now):key(START); })();
+  function renderFinder(){
+    const out=$("fOut"); out.innerHTML="";
+    const k=$("fDate").value; if(!k){ out.textContent="Pick a day first."; return; }
+    let gf=+$("fFrom").value, gt=+$("fTo").value; if(gt<=gf){ gt=gf+1; $("fTo").value=gt; }
+    const need=[]; for(let h=gf;h<gt;h++) need.push(h);
+    const grpF=$("fGroup").value; const groupOf=s=>((s.info||{}).group==="SMLH"?"SMLH":"SALH");
+    const singers=everyone.filter(s=>grpF==="all"||groupOf(s)===grpF);
+    const buckets={free:[],partly:[],no:[],unknown:[]};
+    singers.forEach(s=>{ const hs=norm(s.days&&s.days[k]); let st="unknown"; if(hs!=null){ const n=need.filter(h=>hs.includes(h)).length; st=hs.length===0?"no":n===need.length?"free":n>0?"partly":"no"; } buckets[st].push({s,hs}); });
+    const PO={S:0,A:1,T:2,B:3}; const byPart=(a,b)=>((PO[(a.s.voice||"")[0]]??9)-(PO[(b.s.voice||"")[0]]??9))||(a.s.name||"").localeCompare(b.s.name||"");
+    Object.values(buckets).forEach(l=>l.sort(byPart));
+    const parts=new Set(), backup=new Set(); buckets.free.forEach(({s})=>{ const v=String(s.voice||""); if(v[0]) parts.add(v[0]); if(v[1]) backup.add(v[1]); });
+    const head=document.createElement("div"); head.className="d"; head.style.marginBottom="8px";
+    head.textContent=fmtDate(k)+", "+fmtH(gf)+" to "+fmtH(gt)+": "+buckets.free.length+" free the whole time";
+    const pe=document.createElement("div"); pe.className="parts"; pe.style.cssText="display:inline-flex;margin-left:10px;vertical-align:middle"; ["S","A","T","B"].forEach(p=>{const sp=document.createElement("span");sp.textContent=p;if(parts.has(p)){sp.className="on";}else if(backup.has(p)){sp.className="backup";}pe.appendChild(sp)}); head.appendChild(pe);
+    out.appendChild(head);
+    const dayGigs=gigs.filter(g=>g.date===k&&(g.status||(g.confirmed?"Confirmed":"Inquiry"))!=="Cancelled"&&g.start&&g.end&&!(+g.end.split(":")[0]+(+g.end.split(":")[1]>0?1:0)<=gf||+g.start.split(":")[0]>=gt));
+    const booked=new Set(); dayGigs.forEach(g=>g.singers.forEach(n=>booked.add(String(n).trim().toLowerCase())));
+    if(dayGigs.length){ const gl=document.createElement("div"); gl.className="gigline"; gl.style.marginBottom="8px"; gl.textContent="Already on the books then: "+dayGigs.map(g=>(g.status||(g.confirmed?"Confirmed":"Inquiry"))+" "+tfmt(g.start)+"–"+tfmt(g.end)+" "+(g.city||"")+(g.singers.length?" ("+g.singers.join(", ")+")":"")).join("; "); out.appendChild(gl); }
+    const sec=(title,list,clsName,showHours)=>{ if(!list.length) return; const w=document.createElement("div"); w.style.marginTop="8px"; const t=document.createElement("div"); t.className="note"; t.style.fontWeight="700"; t.textContent=title+" ("+list.length+")"; w.appendChild(t); const chips=document.createElement("div"); chips.className="chips";
+      list.forEach(({s,hs})=>{ const c=document.createElement("span"); c.className="chip "+clsName; c.textContent=(s.name||"Unnamed")+(showHours&&hs&&hs.length&&!isAll(hs)?" "+rangeText(hs,true):""); if(s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} if(booked.has((s.name||"").trim().toLowerCase())){ c.title="Already assigned to a gig at this time"; c.textContent+=" (booked)"; } chips.appendChild(c); });
+      w.appendChild(chips); out.appendChild(w); };
+    sec("Free the whole time",buckets.free,"yes",false);
+    sec("Free for part of it",buckets.partly,"part",true);
+    sec("Not available",buckets.no,"no",false);
+    sec("Haven't answered that day",buckets.unknown,"",false);
+    if(buckets.free.length){ const cb=document.createElement("button"); cb.type="button"; cb.className="btn sm"; cb.style.marginTop="10px"; cb.textContent="Copy numbers of everyone free"; const cn=document.createElement("div"); cn.className="note"; cb.addEventListener("click",()=>copyText(phonesOf(buckets.free.map(x=>x.s)),cn,buckets.free.filter(x=>x.s.phone).length+" numbers")); out.appendChild(cb); out.appendChild(cn); }
+    if(!singers.length){ out.textContent="No singers loaded yet."; }
+  }
+  $("fGo").addEventListener("click",renderFinder);
+  ["fDate","fFrom","fTo","fGroup"].forEach(id=>$(id).addEventListener("change",()=>{ if($("fOut").childNodes.length) renderFinder(); }));
   $("toggleTable").addEventListener("click",()=>{ tableMode=!tableMode; $("toggleTable").textContent=tableMode?"Switch to day-by-day view":"Switch to table view"; renderAdmin(); });
 
   // ---- gigs ----
