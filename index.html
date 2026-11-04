@@ -580,7 +580,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       const order={yes:0,part:1,no:2};
       r.rows.slice().sort((a,b)=>order[cls(a.hs)]-order[cls(b.hs)]).forEach(({s,hs})=>{
         const c=document.createElement("span"); c.className="chip "+cls(hs)+((hs.length&&!covers(hs,gf,gt))?" dim":""); c.textContent=(s.name||"Unnamed")+(hs.length&&!isAll(hs)?" "+rangeText(hs,true):"");
-        if(s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} chips.appendChild(c); });
+        if(s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} chipTap(c,s); chips.appendChild(c); });
       if(!r.rows.length){const e=document.createElement("span");e.className="empty";e.textContent="No answers yet";chips.appendChild(e);}
       row.appendChild(dd); row.appendChild(chips); host.appendChild(row);
     });
@@ -603,6 +603,9 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     setTimeout(()=>{ if(!noteEl.querySelector("textarea")) noteEl.textContent=""; },4000);
   }
   const phonesOf = list => list.map(s=>(s.phone||"").trim()).filter(Boolean).join(", ");
+  // tap a singer chip (admin views) to copy their phone number
+  let toastT=null; function toast(msg){ let t=$("toast"); if(!t){ t=document.createElement("div"); t.id="toast"; t.style.cssText="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d5c3a;color:#fff;padding:8px 14px;border-radius:999px;font-size:13px;z-index:9999;box-shadow:0 4px 14px rgba(0,0,0,.2)"; document.body.appendChild(t);} t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>{t.hidden=true;},2500); }
+  function chipTap(c,s){ if(!s) return; c.style.cursor="pointer"; c.title=(s.phone?"Tap to copy "+s.phone:"No phone number given"); c.addEventListener("click",async()=>{ if(!s.phone){ toast((s.name||"This singer")+" has no phone number on file."); return; } try{ await navigator.clipboard.writeText(s.phone.trim()); toast("Copied "+(s.name||"")+": "+s.phone.trim()); }catch(e){ toast((s.name||"")+": "+s.phone.trim()); } }); }
   function renderPeople(singers){
     const t=$("peopleTable"); t.innerHTML="";
     const hr=document.createElement("tr"); ["Name","Group","Part","Phone","Travel","Drives","Lead","Languages","Notes","Days answered",""].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.appendChild(th)}); t.appendChild(hr);
@@ -643,7 +646,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
     const booked=new Set(); dayGigs.forEach(g=>g.singers.forEach(n=>booked.add(String(n).trim().toLowerCase())));
     if(dayGigs.length){ const gl=document.createElement("div"); gl.className="gigline"; gl.style.marginBottom="8px"; gl.textContent="Already on the books then: "+dayGigs.map(g=>(g.status||(g.confirmed?"Confirmed":"Inquiry"))+" "+tfmt(g.start)+"–"+tfmt(g.end)+" "+(g.city||"")+(g.singers.length?" ("+g.singers.join(", ")+")":"")).join("; "); out.appendChild(gl); }
     const sec=(title,list,clsName,showHours)=>{ if(!list.length) return; const w=document.createElement("div"); w.style.marginTop="8px"; const t=document.createElement("div"); t.className="note"; t.style.fontWeight="700"; t.textContent=title+" ("+list.length+")"; w.appendChild(t); const chips=document.createElement("div"); chips.className="chips";
-      list.forEach(({s,hs})=>{ const c=document.createElement("span"); c.className="chip "+clsName; c.textContent=(s.name||"Unnamed")+(showHours&&hs&&hs.length&&!isAll(hs)?" "+rangeText(hs,true):""); if(s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} if(booked.has((s.name||"").trim().toLowerCase())){ c.title="Already assigned to a gig at this time"; c.textContent+=" (booked)"; } chips.appendChild(c); });
+      list.forEach(({s,hs})=>{ const c=document.createElement("span"); c.className="chip "+clsName; c.textContent=(s.name||"Unnamed")+(showHours&&hs&&hs.length&&!isAll(hs)?" "+rangeText(hs,true):""); if(s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} if(booked.has((s.name||"").trim().toLowerCase())){ c.textContent+=" (booked)"; } chipTap(c,s); chips.appendChild(c); });
       w.appendChild(chips); out.appendChild(w); };
     sec("Free the whole time",buckets.free,"yes",false);
     sec("Free for part of it",buckets.partly,"part",true);
@@ -706,7 +709,7 @@ th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute
       card.appendChild(meta);
       if(g.requests||g.notes){ const n=document.createElement("div"); n.className="note"; n.textContent=[g.requests?"Requests: "+g.requests:"",g.notes?"Notes: "+g.notes:""].filter(Boolean).join("  ·  "); card.appendChild(n); }
       const chips=document.createElement("div"); chips.className="chips";
-      g.singers.forEach(n=>{ const s=singerByName(n); const c=document.createElement("span"); c.className="chip "+(s?({free:"yes",partly:"part",no:"no",unknown:""})[freeFor(s,g)]:""); c.textContent=n; if(s&&s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} if(g.paid[n]) c.title="Paid"; chips.appendChild(c); });
+      g.singers.forEach(n=>{ const s=singerByName(n); const c=document.createElement("span"); c.className="chip "+(s?({free:"yes",partly:"part",no:"no",unknown:""})[freeFor(s,g)]:""); c.textContent=n; if(s&&s.voice){const p=document.createElement("span");p.className="p";p.textContent=voiceLabel(s.voice);c.appendChild(p);} chipTap(c,s); if(g.paid[n]) c.title=(c.title?c.title+" (paid)":"Paid"); chips.appendChild(c); });
       if(!g.singers.length){ const e=document.createElement("span"); e.className="empty"; e.textContent="No singers assigned yet."; chips.appendChild(e); }
       card.appendChild(chips);
       const tools=document.createElement("div"); tools.className="tools"; const note=document.createElement("span"); note.className="note";
